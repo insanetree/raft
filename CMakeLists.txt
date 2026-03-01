@@ -6,3 +6,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(raft_project)
+
+add_subdirectory(raft)
+

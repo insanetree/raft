@@ -1,2 +1,5 @@
-add_library(raft)
-target_include_directories(raft PUBLIC ${CMAKE_CURRENT_SRC_DIR}/include)
+add_library(raft SHARED
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/raft_node.cpp
+    )
+
+target_include_directories(raft PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
