@@ -1,17 +1,13 @@
 #ifndef __RAFT_NODE_HPP__
 #define __RAFT_NODE_HPP__
 
+#include "raft_types.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-using node_id_t = std::size_t;
-using leader_term_t = std::size_t;
-using log_entry_index_t = std::size_t;
-
-constexpr node_id_t INVALID_NODE_ID = 0;
 
 class raft_node
 {
