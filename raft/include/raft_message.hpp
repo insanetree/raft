@@ -36,9 +36,9 @@ struct request_vote_response
     bool vote_granted;
 };
 
-using raft_message = std::variant<append_entry_request,
-                                  append_entry_response,
-                                  request_vote_request,
-                                  request_vote_response>;
+using raft_message_t = std::variant<append_entry_request,
+                                    append_entry_response,
+                                    request_vote_request,
+                                    request_vote_response>;
 
 #endif

@@ -1,10 +1,13 @@
 #ifndef __RAFT_NODE_HPP__
 #define __RAFT_NODE_HPP__
 
-#include "raft_types.hpp"
+#include "raft_message.hpp"
+
+#include "raft_storage.hpp"
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -22,7 +25,8 @@ public:
     raft_node(node_id_t id,
               std::vector<node_id_t> peers,
               size_t election_threshold,
-              size_t heartbeat_threshold);
+              size_t heartbeat_threshold,
+              std::weak_ptr<raft_storage> storage);
 
     node_id_t get_id() const { return m_id; }
 
@@ -35,9 +39,7 @@ private:
     const node_id_t m_id;
     const std::vector<node_id_t> m_peers;
     node_state_e m_state;
-    leader_term_t m_current_term;
-    node_id_t m_voted_for;
-    // TODO: log
+    std::weak_ptr<raft_storage> m_storage;
 
     // Timeouts
     const size_t m_election_threshold;
