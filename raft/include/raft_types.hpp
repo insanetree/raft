@@ -14,8 +14,8 @@ using log_entry_index_t = std::size_t;
 
 struct log_entry_t
 {
-    leader_term_t term;
-    std::vector<uint8_t> command;
+	leader_term_t term;
+	std::vector<uint8_t> command;
 };
 
 #endif

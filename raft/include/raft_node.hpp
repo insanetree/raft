@@ -15,43 +15,47 @@
 class raft_node
 {
 public:
-    enum class node_state_e
-    {
-        FOLLOWER,
-        LEADER,
-        CANDIDATE
-    };
+	enum class node_state_e
+	{
+		FOLLOWER,
+		LEADER,
+		CANDIDATE
+	};
 
-    raft_node(node_id_t id,
-              std::vector<node_id_t> peers,
-              size_t election_threshold,
-              size_t heartbeat_threshold,
-              std::weak_ptr<raft_storage> storage);
+	raft_node(node_id_t id,
+	          std::vector<node_id_t> peers,
+	          size_t election_threshold,
+	          size_t heartbeat_threshold,
+	          std::shared_ptr<raft_storage> storage);
 
-    node_id_t get_id() const { return m_id; }
+	raft_node(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage);
 
-    node_state_e get_state() const { return m_state; }
+	node_id_t get_id() const { return m_id; }
 
-    void tick();
+	node_state_e get_state() const { return m_state; }
+
+	void tick();
+
+	void step(const std::vector<raft_message_t>& messages);
 
 private:
-    // Persistent state
-    const node_id_t m_id;
-    const std::vector<node_id_t> m_peers;
-    node_state_e m_state;
-    std::weak_ptr<raft_storage> m_storage;
+	// Persistent state
+	const node_id_t m_id;
+	const std::vector<node_id_t> m_peers;
+	node_state_e m_state;
+	std::shared_ptr<raft_storage> m_storage;
 
-    // Timeouts
-    const size_t m_election_threshold;
-    size_t m_election_timeout;
-    const size_t m_heartbeat_threshold;
-    size_t m_heartbeat_timeout;
+	// Timeouts
+	const size_t m_election_threshold;
+	size_t m_election_timeout;
+	const size_t m_heartbeat_threshold;
+	size_t m_heartbeat_timeout;
 
-    // Volatile state
-    log_entry_index_t m_commit_index;
-    log_entry_index_t m_last_applied;
-    std::unordered_map<node_id_t, log_entry_index_t> m_next_index;
-    std::unordered_map<node_id_t, log_entry_index_t> m_match_index;
+	// Volatile state
+	log_entry_index_t m_commit_index;
+	log_entry_index_t m_last_applied;
+	std::unordered_map<node_id_t, log_entry_index_t> m_next_index;
+	std::unordered_map<node_id_t, log_entry_index_t> m_match_index;
 };
 
 #endif
