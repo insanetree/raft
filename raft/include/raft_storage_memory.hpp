@@ -18,7 +18,9 @@ public:
 
 	void set_voted_for(const node_id_t voted_for) override;
 
-	log_entry_t get_log_entry(const log_entry_index_t index) const override;
+	const log_entry_t& get_log_entry(const log_entry_index_t index) const override;
+
+	log_entry_index_t get_log_size() const override;
 
 	void push_log_entry(const log_entry_t) override;
 

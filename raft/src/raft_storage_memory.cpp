@@ -24,10 +24,16 @@ raft_storage_memory::set_voted_for(const node_id_t voted_for)
 	m_voted_for = voted_for;
 }
 
-log_entry_t
+const log_entry_t&
 raft_storage_memory::get_log_entry(const log_entry_index_t index) const
 {
 	return m_log.at(index);
+}
+
+log_entry_index_t
+raft_storage_memory::get_log_size() const
+{
+	return m_log.size();
 }
 
 void

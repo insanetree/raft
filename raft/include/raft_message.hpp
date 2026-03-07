@@ -7,6 +7,7 @@
 
 struct append_entry_request
 {
+	node_id_t dest;
 	leader_term_t leader_term;
 	node_id_t leader_id;
 	log_entry_index_t prev_log_index;
@@ -17,6 +18,7 @@ struct append_entry_request
 
 struct append_entry_response
 {
+	node_id_t dest;
 	node_id_t follower_id;
 	leader_term_t term;
 	bool success;
@@ -24,6 +26,7 @@ struct append_entry_response
 
 struct request_vote_request
 {
+	node_id_t dest;
 	leader_term_t candidate_term;
 	node_id_t candidate_id;
 	log_entry_index_t last_log_index;
@@ -32,6 +35,7 @@ struct request_vote_request
 
 struct request_vote_response
 {
+	node_id_t dest;
 	leader_term_t term;
 	bool vote_granted;
 };
