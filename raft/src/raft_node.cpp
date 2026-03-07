@@ -91,8 +91,9 @@ raft_node::send_heartbeats()
 }
 
 std::vector<raft_message_t>
-raft_node::get_messages(){
-    std::vector<raft_message_t> sent_messages{std::move(m_outbox)};
-    m_outbox = {};
-    return std::move(sent_messages);
+raft_node::get_messages()
+{
+	std::vector<raft_message_t> sent_messages{std::move(m_outbox)};
+	m_outbox = {};
+	return std::move(sent_messages);
 }

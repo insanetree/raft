@@ -36,7 +36,7 @@ public:
 
 	void step(const std::vector<raft_message_t>& messages);
 
-    std::vector<raft_message_t> get_messages();
+	std::vector<raft_message_t> get_messages();
 
 private:
 	static size_t random_election_threshold();
