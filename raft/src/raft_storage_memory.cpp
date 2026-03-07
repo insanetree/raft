@@ -27,7 +27,7 @@ raft_storage_memory::set_voted_for(const node_id_t voted_for)
 const log_entry_t&
 raft_storage_memory::get_log_entry(const log_entry_index_t index) const
 {
-	return m_log.at(index);
+	return m_log.at(index - 1);
 }
 
 log_entry_index_t
