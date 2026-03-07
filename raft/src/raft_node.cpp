@@ -1,5 +1,6 @@
 #include "raft_node.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <random>
 #include <vector>
@@ -92,6 +93,17 @@ raft_node::send_heartbeats()
 		msg.dest = peer;
 		m_outbox.push_back(msg);
 	}
+}
+
+void
+raft_node::step(const raft_message_t& message)
+{
+}
+
+void
+raft_node::step(const std::vector<raft_message_t>& messages)
+{
+	std::for_each_n(messages.begin(), messages.size(), [this](const raft_message_t& msg) { step(msg); });
 }
 
 std::vector<raft_message_t>

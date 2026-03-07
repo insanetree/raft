@@ -34,6 +34,8 @@ public:
 
 	void tick();
 
+	void step(const raft_message_t& message);
+
 	void step(const std::vector<raft_message_t>& messages);
 
 	std::vector<raft_message_t> get_messages();
