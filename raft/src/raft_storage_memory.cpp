@@ -1,13 +1,13 @@
 #include "raft_storage_memory.hpp"
 
 leader_term_t
-raft_storage_memory::get_current_term() const
+raft_storage_memory::get_term() const
 {
 	return m_current_term;
 }
 
 void
-raft_storage_memory::set_current_term(const leader_term_t current_term)
+raft_storage_memory::set_term(const leader_term_t current_term)
 {
 	m_current_term = current_term;
 }

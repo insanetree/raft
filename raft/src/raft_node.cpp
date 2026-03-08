@@ -32,6 +32,13 @@ raft_node::raft_node(node_id_t id,
 raft_node::raft_node(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage) :
 	raft_node(id, peers, random_election_threshold(), storage) {};
 
+leader_term_t
+raft_node::get_last_log_term() const
+{
+	log_entry_index_t last_log_index = m_storage->get_log_size();
+	return last_log_index ? m_storage->get_log_entry(last_log_index).term : 0ul;
+}
+
 void
 raft_node::tick()
 {
@@ -57,17 +64,18 @@ raft_node::start_election()
 {
 	assert(m_state != node_state_e::LEADER);
 	m_state = node_state_e::CANDIDATE;
+	m_storage->set_voted_for(m_id);
 	m_election_timeout = 0;
 	m_election_threshold = random_election_threshold();
 
-	leader_term_t term = m_storage->get_current_term();
-	m_storage->set_current_term(++term);
+	leader_term_t term = m_storage->get_term();
+	m_storage->set_term(++term);
 	log_entry_index_t last_log_index = m_storage->get_log_size();
 
 	request_vote_request msg = {.candidate_term = term,
 	                            .candidate_id = m_id,
 	                            .last_log_index = last_log_index,
-	                            .last_log_term = last_log_index ? m_storage->get_log_entry(last_log_index).term : 0ul};
+	                            .last_log_term = get_last_log_term()};
 	for (node_id_t peer : m_peers) {
 		msg.dest = peer;
 		m_outbox.push_back(msg);
@@ -80,13 +88,13 @@ raft_node::send_heartbeats()
 	assert(m_state == node_state_e::LEADER);
 	m_heartbeat_timeout = 0;
 
-	leader_term_t term = m_storage->get_current_term();
+	leader_term_t term = m_storage->get_term();
 	log_entry_index_t last_log_index = m_storage->get_log_size();
 
-	append_entry_request msg = {.leader_term = m_storage->get_current_term(),
+	append_entry_request msg = {.leader_term = m_storage->get_term(),
 	                            .leader_id = m_id,
 	                            .prev_log_index = last_log_index,
-	                            .prev_log_term = last_log_index ? m_storage->get_log_entry(last_log_index).term : 0ul,
+	                            .prev_log_term = get_last_log_term(),
 	                            .entries = {},
 	                            .leader_commit = m_commit_index};
 	for (node_id_t peer : m_peers) {
@@ -96,8 +104,54 @@ raft_node::send_heartbeats()
 }
 
 void
+raft_node::handle(const append_entry_request& message)
+{
+}
+
+void
+raft_node::handle(const append_entry_response& message)
+{
+}
+
+void
+raft_node::handle(const request_vote_request& message)
+{
+	assert(message.dest == m_id);
+	request_vote_response response = {
+		.dest = message.candidate_id, .term = m_storage->get_term(), .vote_granted = false};
+
+	if (message.candidate_term < m_storage->get_term()) {
+		goto respond;
+	}
+
+	if (m_storage->get_voted_for() != INVALID_NODE_ID && m_storage->get_voted_for() != message.candidate_id) {
+		goto respond;
+	}
+
+	if (message.last_log_term < get_last_log_term()) {
+		goto respond;
+	}
+
+	if (message.last_log_term == get_last_log_term() && message.last_log_index < m_storage->get_log_size()) {
+		goto respond;
+	}
+
+	response.vote_granted = true;
+	m_storage->set_voted_for(message.candidate_id);
+respond:
+	m_outbox.push_back(response);
+	return;
+}
+
+void
+raft_node::handle(const request_vote_response& message)
+{
+}
+
+void
 raft_node::step(const raft_message_t& message)
 {
+	std::visit([this](const auto& m) { handle(m); }, message);
 }
 
 void

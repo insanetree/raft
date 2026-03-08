@@ -6,9 +6,9 @@
 class raft_storage
 {
 public:
-	virtual leader_term_t get_current_term() const = 0;
+	virtual leader_term_t get_term() const = 0;
 
-	virtual void set_current_term(const leader_term_t current_term) = 0;
+	virtual void set_term(const leader_term_t current_term) = 0;
 
 	virtual node_id_t get_voted_for() const = 0;
 

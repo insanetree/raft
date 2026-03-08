@@ -19,12 +19,14 @@ TEST_F(RaftNodeTest, InitialStateIsFollower)
 {
 	raft_node node(id, peers, m_storage);
 	EXPECT_EQ(node.get_state(), raft_node::node_state_e::FOLLOWER);
+	EXPECT_EQ(node.get_term(), 0);
 }
 
 TEST_F(RaftNodeTest, StartElection)
 {
 	raft_node node(id, peers, 3, m_storage);
 	EXPECT_EQ(node.get_state(), raft_node::node_state_e::FOLLOWER);
+	EXPECT_EQ(node.get_term(), 0);
 
 	node.tick();
 	EXPECT_EQ(node.get_state(), raft_node::node_state_e::FOLLOWER);
@@ -34,6 +36,7 @@ TEST_F(RaftNodeTest, StartElection)
 	EXPECT_EQ(node.get_state(), raft_node::node_state_e::FOLLOWER);
 	node.tick();
 	EXPECT_EQ(node.get_state(), raft_node::node_state_e::CANDIDATE);
+	EXPECT_EQ(node.get_term(), 1);
 
 	std::vector<raft_message_t> messages = node.get_messages();
 	ASSERT_TRUE(std::all_of(messages.begin(), messages.end(), [](const raft_message_t& msg) {
@@ -47,4 +50,25 @@ TEST_F(RaftNodeTest, StartElection)
 	EXPECT_TRUE(std::all_of(messages_typed.begin(), messages_typed.end(), [](const request_vote_request& msg) {
 		return msg.candidate_id == 1 && msg.candidate_term == 1;
 	}));
+}
+
+TEST_F(RaftNodeTest, CandidateIncrementsTerm)
+{
+	raft_node node(id, peers, 3, m_storage);
+	EXPECT_EQ(node.get_term(), 0);
+
+	for (int i = 0; i < 4; i++)
+		node.tick();
+	EXPECT_EQ(node.get_state(), raft_node::node_state_e::CANDIDATE);
+	EXPECT_EQ(node.get_term(), 1);
+}
+
+TEST_F(RaftNodeTest, CandidateVotesForItself)
+{
+	raft_node node(id, peers, 3, m_storage);
+
+	for (int i = 0; i < 4; i++)
+		node.tick();
+
+	EXPECT_EQ(node.get_voted_for(), id);
 }

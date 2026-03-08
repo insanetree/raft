@@ -10,9 +10,9 @@ public:
 	raft_storage_memory(const raft_storage_memory&) = delete;
 	raft_storage_memory(raft_storage_memory&&) = delete;
 
-	leader_term_t get_current_term() const override;
+	leader_term_t get_term() const override;
 
-	void set_current_term(const leader_term_t current_term) override;
+	void set_term(const leader_term_t current_term) override;
 
 	node_id_t get_voted_for() const override;
 

@@ -32,6 +32,10 @@ public:
 
 	node_state_e get_state() const { return m_state; }
 
+	leader_term_t get_term() const { return m_storage->get_term(); };
+
+	node_id_t get_voted_for() const { return m_storage->get_voted_for(); }
+
 	void tick();
 
 	void step(const raft_message_t& message);
@@ -43,9 +47,16 @@ public:
 private:
 	static size_t random_election_threshold();
 
+	leader_term_t get_last_log_term() const;
+
 	void start_election();
 
 	void send_heartbeats();
+
+	void handle(const append_entry_request&);
+	void handle(const append_entry_response&);
+	void handle(const request_vote_request&);
+	void handle(const request_vote_response&);
 
 	// Persistent state
 	const node_id_t m_id;
