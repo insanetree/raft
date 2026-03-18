@@ -49,6 +49,11 @@ private:
 
 	leader_term_t get_last_log_term() const;
 
+	void state_transition(node_state_e state);
+
+	/// @brief Updates the term and nullifies voted_for
+	void update_term(const leader_term_t new_term);
+
 	void start_election();
 
 	void send_heartbeats();
@@ -73,8 +78,12 @@ private:
 	// Volatile state
 	log_entry_index_t m_commit_index;
 	log_entry_index_t m_last_applied;
+
+	// Leader volatile state
 	std::unordered_map<node_id_t, log_entry_index_t> m_next_index;
 	std::unordered_map<node_id_t, log_entry_index_t> m_match_index;
+	// Candidate volatile state
+	size_t m_received_votes;
 
 	std::vector<raft_message_t> m_outbox;
 };

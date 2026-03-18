@@ -24,6 +24,7 @@ public:
 
 	void push_log_entry(const log_entry_t) override;
 
+    void pop_log_entry() override;
 private:
 	leader_term_t m_current_term = 0;
 	node_id_t m_voted_for = INVALID_NODE_ID;

@@ -19,6 +19,8 @@ public:
 	virtual log_entry_index_t get_log_size() const = 0;
 
 	virtual void push_log_entry(const log_entry_t) = 0;
+
+    virtual void pop_log_entry() = 0;
 };
 
 #endif

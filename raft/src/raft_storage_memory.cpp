@@ -1,4 +1,6 @@
-#include "raft_storage_memory.hpp"
+#include "raft/raft_storage_memory.hpp"
+
+#include <cassert>
 
 leader_term_t
 raft_storage_memory::get_term() const
@@ -27,6 +29,7 @@ raft_storage_memory::set_voted_for(const node_id_t voted_for)
 const log_entry_t&
 raft_storage_memory::get_log_entry(const log_entry_index_t index) const
 {
+	assert(index > 0);
 	return m_log.at(index - 1);
 }
 
@@ -40,4 +43,11 @@ void
 raft_storage_memory::push_log_entry(const log_entry_t log_entry)
 {
 	m_log.push_back(log_entry);
+}
+
+void
+raft_storage_memory::pop_log_entry()
+{
+    assert(m_log.size() > 0);
+    m_log.pop_back();
 }

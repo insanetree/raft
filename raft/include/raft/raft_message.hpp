@@ -27,6 +27,7 @@ struct append_entry_response
 struct request_vote_request
 {
 	node_id_t dest;
+	node_id_t src;
 	leader_term_t candidate_term;
 	node_id_t candidate_id;
 	log_entry_index_t last_log_index;
