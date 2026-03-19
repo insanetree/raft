@@ -125,7 +125,7 @@ raft_node::send_heartbeats()
 	assert(m_state == node_state_e::LEADER);
 	m_heartbeat_timeout = 0;
 
-	append_entry_request msg = {
+	append_entries_request msg = {
 		.leader_term = m_storage->get_term(), .leader_id = m_id, .entries = {}, .leader_commit = m_commit_index};
 	for (node_id_t peer : m_peers) {
 		msg.dest = peer;
@@ -136,7 +136,7 @@ raft_node::send_heartbeats()
 }
 
 void
-raft_node::handle(const append_entry_request& message)
+raft_node::handle(const append_entries_request& message)
 {
 	assert(message.dest == m_id);
 
@@ -154,11 +154,11 @@ raft_node::handle(const append_entry_request& message)
 
 	m_election_timeout = 0;
 
-	append_entry_response response = {.dest = message.leader_id,
-	                                  .follower_id = m_id,
-	                                  .term = m_storage->get_term(),
-	                                  .prev_log_index = m_storage->get_log_size(),
-	                                  .count = 0ul};
+	append_entries_response response = {.dest = message.leader_id,
+	                                    .follower_id = m_id,
+	                                    .term = m_storage->get_term(),
+	                                    .prev_log_index = m_storage->get_log_size(),
+	                                    .count = 0ul};
 
 	if (message.leader_term < m_storage->get_term()) {
 		response.success = false;
@@ -197,7 +197,7 @@ respond:
 }
 
 void
-raft_node::handle(const append_entry_response& message)
+raft_node::handle(const append_entries_response& message)
 {
 	assert(message.dest == m_id);
 

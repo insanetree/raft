@@ -5,7 +5,7 @@
 
 #include <variant>
 
-struct append_entry_request
+struct append_entries_request
 {
 	node_id_t dest;
 	leader_term_t leader_term;
@@ -16,7 +16,7 @@ struct append_entry_request
 	log_entry_index_t leader_commit;
 };
 
-struct append_entry_response
+struct append_entries_response
 {
 	node_id_t dest;
 	node_id_t follower_id;
@@ -45,6 +45,6 @@ struct request_vote_response
 };
 
 using raft_message_t =
-	std::variant<append_entry_request, append_entry_response, request_vote_request, request_vote_response>;
+	std::variant<append_entries_request, append_entries_response, request_vote_request, request_vote_response>;
 
 #endif
