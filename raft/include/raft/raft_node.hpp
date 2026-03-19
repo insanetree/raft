@@ -37,6 +37,8 @@ public:
 
 	node_id_t get_voted_for() const { return m_storage->get_voted_for(); }
 
+	size_t get_election_threshold() const { return m_election_threshold; }
+
 	void tick();
 
 	void step(const raft_message_t& message);

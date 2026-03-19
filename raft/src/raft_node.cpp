@@ -243,14 +243,15 @@ void
 raft_node::handle(const request_vote_request& message)
 {
 	assert(message.dest == m_id);
-	if (message.candidate_term > m_storage->get_term()) {
-		update_term(message.candidate_term);
-	}
 	request_vote_response response = {
 		.dest = message.candidate_id, .src = m_id, .term = m_storage->get_term(), .vote_granted = false};
 
-	if (message.candidate_term < m_storage->get_term()) {
+	if (message.candidate_term <= m_storage->get_term()) {
 		goto respond;
+	}
+
+	if (message.candidate_term > m_storage->get_term()) {
+		update_term(message.candidate_term);
 	}
 
 	if (m_storage->get_voted_for() != INVALID_NODE_ID && m_storage->get_voted_for() != message.candidate_id) {
