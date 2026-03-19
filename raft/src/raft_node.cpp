@@ -136,6 +136,25 @@ raft_node::send_heartbeats()
 }
 
 void
+raft_node::update_commit_index()
+{
+	std::vector<log_entry_index_t> match_indices;
+	match_indices.reserve(m_peers.size() + 1);
+	match_indices.push_back(m_storage->get_log_size());
+	for (const auto& [peer, idx] : m_match_index) {
+		match_indices.push_back(idx);
+	}
+
+	std::sort(match_indices.begin(), match_indices.end(), std::greater<>());
+
+	log_entry_index_t N = match_indices[match_indices.size() / 2];
+
+	if (N > m_commit_index && N > 0 && m_storage->get_log_entry(N).term == m_storage->get_term()) {
+		m_commit_index = N;
+	}
+}
+
+void
 raft_node::handle(const append_entries_request& message)
 {
 	assert(message.dest == m_id);
@@ -217,6 +236,7 @@ raft_node::handle(const append_entries_response& message)
 	log_entry_index_t match = message.prev_log_index + message.count;
 	m_match_index.at(message.follower_id) = std::max(m_match_index.at(message.follower_id), match);
 	m_next_index.at(message.follower_id) = m_match_index.at(message.follower_id) + 1;
+	update_commit_index();
 }
 
 void

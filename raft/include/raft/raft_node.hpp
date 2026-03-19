@@ -59,6 +59,8 @@ private:
 
 	void send_heartbeats();
 
+	void update_commit_index();
+
 	void handle(const append_entries_request&);
 	void handle(const append_entries_response&);
 	void handle(const request_vote_request&);
