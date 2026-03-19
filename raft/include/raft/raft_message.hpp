@@ -1,7 +1,7 @@
 #ifndef __RAFT_MESSAGE_HPP__
 #define __RAFT_MESSAGE_HPP__
 
-#include "raft_types.hpp"
+#include "raft/raft_types.hpp"
 
 #include <variant>
 
@@ -22,12 +22,14 @@ struct append_entry_response
 	node_id_t follower_id;
 	leader_term_t term;
 	bool success;
+
+	log_entry_index_t prev_log_index;
+	size_t count;
 };
 
 struct request_vote_request
 {
 	node_id_t dest;
-	node_id_t src;
 	leader_term_t candidate_term;
 	node_id_t candidate_id;
 	log_entry_index_t last_log_index;
@@ -37,6 +39,7 @@ struct request_vote_request
 struct request_vote_response
 {
 	node_id_t dest;
+	node_id_t src;
 	leader_term_t term;
 	bool vote_granted;
 };

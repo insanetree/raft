@@ -48,6 +48,6 @@ raft_storage_memory::push_log_entry(const log_entry_t log_entry)
 void
 raft_storage_memory::pop_log_entry()
 {
-    assert(m_log.size() > 0);
-    m_log.pop_back();
+	assert(m_log.size() > 0);
+	m_log.pop_back();
 }

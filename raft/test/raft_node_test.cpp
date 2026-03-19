@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "raft_node.hpp"
-#include "raft_storage_memory.hpp"
+#include "raft/raft_node.hpp"
+#include "raft/raft_storage_memory.hpp"
 
 class RaftNodeTest : public testing::Test
 {

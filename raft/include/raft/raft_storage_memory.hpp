@@ -1,7 +1,7 @@
 #ifndef __RAFT_STORAGE_MEMORY_HPP__
 #define __RAFT_STORAGE_MEMORY_HPP__
 
-#include "raft_storage.hpp"
+#include "raft/raft_storage.hpp"
 
 class raft_storage_memory final : public raft_storage
 {
@@ -24,7 +24,8 @@ public:
 
 	void push_log_entry(const log_entry_t) override;
 
-    void pop_log_entry() override;
+	void pop_log_entry() override;
+
 private:
 	leader_term_t m_current_term = 0;
 	node_id_t m_voted_for = INVALID_NODE_ID;

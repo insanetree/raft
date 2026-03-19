@@ -1,13 +1,14 @@
 #ifndef __RAFT_NODE_HPP__
 #define __RAFT_NODE_HPP__
 
-#include "raft_message.hpp"
-#include "raft_storage.hpp"
+#include "raft/raft_message.hpp"
+#include "raft/raft_storage.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -83,7 +84,7 @@ private:
 	std::unordered_map<node_id_t, log_entry_index_t> m_next_index;
 	std::unordered_map<node_id_t, log_entry_index_t> m_match_index;
 	// Candidate volatile state
-	size_t m_received_votes;
+	std::unordered_set<node_id_t> m_received_votes;
 
 	std::vector<raft_message_t> m_outbox;
 };

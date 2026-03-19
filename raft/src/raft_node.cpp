@@ -47,7 +47,7 @@ raft_node::state_transition(node_state_e state)
 		m_next_index.clear();
 		m_match_index.clear();
 	} else if (m_state == node_state_e::CANDIDATE) {
-		m_received_votes = 0ul;
+		m_received_votes.clear();
 	}
 
 	// Initialize volatile state
@@ -59,7 +59,7 @@ raft_node::state_transition(node_state_e state)
 			m_match_index.emplace(peer, 0);
 		}
 	} else if (state == node_state_e::CANDIDATE) {
-		m_received_votes = 1;
+		m_received_votes.insert(m_id);
 	}
 
 	// Switch state
@@ -109,8 +109,7 @@ raft_node::start_election()
 	m_storage->set_term(++term);
 	log_entry_index_t last_log_index = m_storage->get_log_size();
 
-	request_vote_request msg = {.src = m_id,
-	                            .candidate_term = term,
+	request_vote_request msg = {.candidate_term = term,
 	                            .candidate_id = m_id,
 	                            .last_log_index = last_log_index,
 	                            .last_log_term = get_last_log_term()};
@@ -145,13 +144,21 @@ raft_node::handle(const append_entry_request& message)
 		update_term(message.leader_term);
 	}
 
+	if (message.leader_term == m_storage->get_term() && m_state == node_state_e::CANDIDATE) {
+		state_transition(node_state_e::FOLLOWER);
+	}
+
 	if (m_state != node_state_e::FOLLOWER) {
 		return;
 	}
 
-    m_election_timeout = 0;
+	m_election_timeout = 0;
 
-	append_entry_response response = {.dest = message.leader_id, .follower_id = m_id, .term = m_storage->get_term()};
+	append_entry_response response = {.dest = message.leader_id,
+	                                  .follower_id = m_id,
+	                                  .term = m_storage->get_term(),
+	                                  .prev_log_index = m_storage->get_log_size(),
+	                                  .count = 0ul};
 
 	if (message.leader_term < m_storage->get_term()) {
 		response.success = false;
@@ -163,24 +170,26 @@ raft_node::handle(const append_entry_request& message)
 		goto respond;
 	}
 
-    while(message.prev_log_index < m_storage->get_log_size()) {
-        m_storage->pop_log_entry();
-    }
+	if (message.prev_log_index > 0 && m_storage->get_log_entry(message.prev_log_index).term != message.prev_log_term) {
+		response.success = false;
+		goto respond;
+	}
 
-    if(message.prev_log_term != get_last_log_term()) {
-        response.success = false;
-        goto respond;
-    }
+	while (message.prev_log_index < m_storage->get_log_size()) {
+		m_storage->pop_log_entry();
+	}
 
-    response.success = true;
+	response.success = true;
 
-    for(const log_entry_t& entry : message.entries) {
-        m_storage->push_log_entry(entry);
-    }
+	for (const log_entry_t& entry : message.entries) {
+		m_storage->push_log_entry(entry);
+	}
 
-    if(message.leader_commit > m_commit_index) {
-        m_commit_index = std::min(m_storage->get_log_size(), message.leader_commit);
-    }
+	response.count = message.entries.size();
+
+	if (message.leader_commit > m_commit_index) {
+		m_commit_index = std::min(m_storage->get_log_size(), message.leader_commit);
+	}
 
 respond:
 	m_outbox.push_back(response);
@@ -200,7 +209,14 @@ raft_node::handle(const append_entry_response& message)
 		return;
 	}
 
+	if (!message.success) {
+		m_next_index.at(message.follower_id) = std::max(m_next_index.at(message.follower_id) - 1ul, 1ul);
+		return;
+	}
 
+	log_entry_index_t match = message.prev_log_index + message.count;
+	m_match_index.at(message.follower_id) = std::max(m_match_index.at(message.follower_id), match);
+	m_next_index.at(message.follower_id) = m_match_index.at(message.follower_id) + 1;
 }
 
 void
@@ -211,7 +227,7 @@ raft_node::handle(const request_vote_request& message)
 		update_term(message.candidate_term);
 	}
 	request_vote_response response = {
-		.dest = message.candidate_id, .term = m_storage->get_term(), .vote_granted = false};
+		.dest = message.candidate_id, .src = m_id, .term = m_storage->get_term(), .vote_granted = false};
 
 	if (message.candidate_term < m_storage->get_term()) {
 		goto respond;
@@ -251,10 +267,10 @@ raft_node::handle(const request_vote_response& message)
 	}
 
 	if (message.vote_granted) {
-		m_received_votes++;
+		m_received_votes.insert(message.src);
 	}
 
-	if (m_received_votes > m_peers.size() / 2) {
+	if (m_received_votes.size() > m_peers.size() / 2) {
 		state_transition(node_state_e::LEADER);
 		send_heartbeats();
 	}

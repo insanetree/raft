@@ -1,7 +1,7 @@
 #ifndef __RAFT_STORAGE_HPP__
 #define __RAFT_STORAGE_HPP__
 
-#include "raft_types.hpp"
+#include "raft/raft_types.hpp"
 
 class raft_storage
 {
@@ -20,7 +20,7 @@ public:
 
 	virtual void push_log_entry(const log_entry_t) = 0;
 
-    virtual void pop_log_entry() = 0;
+	virtual void pop_log_entry() = 0;
 };
 
 #endif
