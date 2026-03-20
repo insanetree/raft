@@ -109,7 +109,8 @@ raft_node::start_election()
 	m_storage->set_term(++term);
 	log_entry_index_t last_log_index = m_storage->get_log_size();
 
-	request_vote_request msg = {.candidate_term = term,
+	request_vote_request msg = {.dest = 0,
+	                            .candidate_term = term,
 	                            .candidate_id = m_id,
 	                            .last_log_index = last_log_index,
 	                            .last_log_term = get_last_log_term()};
@@ -125,8 +126,13 @@ raft_node::send_heartbeats()
 	assert(m_state == node_state_e::LEADER);
 	m_heartbeat_timeout = 0;
 
-	append_entries_request msg = {
-		.leader_term = m_storage->get_term(), .leader_id = m_id, .entries = {}, .leader_commit = m_commit_index};
+	append_entries_request msg = {.dest = 0,
+	                              .leader_term = m_storage->get_term(),
+	                              .leader_id = m_id,
+	                              .prev_log_index = 0,
+	                              .prev_log_term = 0,
+	                              .entries = {},
+	                              .leader_commit = m_commit_index};
 	for (node_id_t peer : m_peers) {
 		msg.dest = peer;
 		msg.prev_log_index = m_next_index.at(peer) - 1ul;
@@ -176,6 +182,7 @@ raft_node::handle(const append_entries_request& message)
 	append_entries_response response = {.dest = message.leader_id,
 	                                    .follower_id = m_id,
 	                                    .term = m_storage->get_term(),
+	                                    .success = false,
 	                                    .prev_log_index = m_storage->get_log_size(),
 	                                    .count = 0ul};
 
