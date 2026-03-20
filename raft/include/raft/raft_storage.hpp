@@ -6,6 +6,8 @@
 class raft_storage
 {
 public:
+	virtual ~raft_storage() = default;
+
 	virtual leader_term_t get_term() const = 0;
 
 	virtual void set_term(const leader_term_t current_term) = 0;
@@ -21,6 +23,9 @@ public:
 	virtual void push_log_entry(const log_entry_t) = 0;
 
 	virtual void pop_log_entry() = 0;
+
+protected:
+	raft_storage() = default;
 };
 
 #endif

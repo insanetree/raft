@@ -3,6 +3,7 @@
 
 #include "raft/raft_message.hpp"
 #include "raft/raft_storage.hpp"
+#include "raft/raft_types.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +39,10 @@ public:
 	node_id_t get_voted_for() const { return m_storage->get_voted_for(); }
 
 	size_t get_election_threshold() const { return m_election_threshold; }
+
+	log_entry_index_t get_commit_index() const { return m_commit_index; }
+
+	log_entry_index_t get_last_applied() const { return m_last_applied; }
 
 	void tick();
 

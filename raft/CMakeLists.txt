@@ -4,5 +4,6 @@ add_library(raft SHARED
     )
 
 target_include_directories(raft PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set_project_warnings(raft)
 
 add_subdirectory(test)

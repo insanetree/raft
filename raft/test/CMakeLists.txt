@@ -7,6 +7,7 @@ target_link_libraries(raft_tests
         raft
         GTest::gtest_main
 )
+set_project_warnings(raft_tests)
 
 include(GoogleTest)
 gtest_discover_tests(raft_tests)

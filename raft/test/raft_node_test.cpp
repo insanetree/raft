@@ -176,7 +176,7 @@ TEST_F(RaftNodeTest, LeaderSendsHeartbeats)
 	for (int i = 0; i < 51; i++)
 		node.tick();
 
-	request_vote_response resp{1, 1, true};
+	request_vote_response resp{.dest = id, .src = 2, .term = 1, .vote_granted = true};
 	node.step(resp);
 
 	auto msgs = node.get_messages();
@@ -224,7 +224,7 @@ TEST_F(RaftNodeTest, LeaderStepsDownOnHigherTermAppend)
 
 	for (int i = 0; i < 4; i++)
 		node.tick();
-	node.step(request_vote_response{1, 1, true});
+	node.step(request_vote_response{.dest = id, .src = 2, .term = 1, .vote_granted = true});
 
 	append_entries_request req{1, 5, 2, 0, 0, {}, 0};
 
@@ -267,12 +267,12 @@ TEST_F(RaftNodeTest, CandidateRestartsElection)
 {
 	raft_node node(id, peers, 3, m_storage);
 
-	for (int i = 0; i < node.get_election_threshold() + 1; i++)
+	for (size_t i = 0; i < node.get_election_threshold() + 1; i++)
 		node.tick();
 
 	EXPECT_EQ(node.get_state(), raft_node::node_state_e::CANDIDATE);
 
-	for (int i = 0; i < node.get_election_threshold() + 1; i++)
+	for (size_t i = 0; i < node.get_election_threshold() + 1; i++)
 		node.tick();
 
 	EXPECT_EQ(node.get_term(), 2);
