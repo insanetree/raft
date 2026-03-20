@@ -7,7 +7,7 @@ cd "$ROOT"
 echo "Formatting repository with clang-format..."
 
 # Number of CPU cores
-JOBS=$(nproc)
+JOBS=4
 
 git ls-files | grep -E '\.(c|cc|cpp|cxx|h|hpp|hh|m|mm)$' | \
 xargs -P "$JOBS" -I{} clang-format -i "{}"
