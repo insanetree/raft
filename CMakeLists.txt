@@ -50,4 +50,4 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_subdirectory(raft)
-
+add_subdirectory(simulation)
