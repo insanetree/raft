@@ -2,6 +2,7 @@
 #define __RAFT_NODE_HPP__
 
 #include "raft/raft_message.hpp"
+#include "raft/raft_state_machine.hpp"
 #include "raft/raft_storage.hpp"
 #include "raft/raft_types.hpp"
 
@@ -26,9 +27,13 @@ public:
 	raft_node(node_id_t id,
 	          std::vector<node_id_t> peers,
 	          size_t election_threshold,
-	          std::shared_ptr<raft_storage> storage);
+	          std::shared_ptr<raft_storage> storage,
+	          std::shared_ptr<raft_state_machine> state_machine);
 
-	raft_node(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage);
+	raft_node(node_id_t id,
+	          std::vector<node_id_t> peers,
+	          std::shared_ptr<raft_storage> storage,
+	          std::shared_ptr<raft_state_machine> state_machine);
 
 	node_id_t get_id() const { return m_id; }
 
@@ -78,6 +83,7 @@ private:
 	const std::vector<node_id_t> m_peers;
 	node_state_e m_state;
 	std::shared_ptr<raft_storage> m_storage;
+	std::shared_ptr<raft_state_machine> m_state_machine;
 
 	// Timeouts
 	size_t m_election_threshold;

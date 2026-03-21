@@ -1,5 +1,5 @@
 add_library(simulation_lib STATIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/raft_server.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/bank_server.cpp
 )
 
 target_include_directories(simulation_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

@@ -18,19 +18,26 @@ raft_node::random_election_threshold()
 raft_node::raft_node(node_id_t id,
                      std::vector<node_id_t> peers,
                      size_t election_threshold,
-                     std::shared_ptr<raft_storage> storage) :
+                     std::shared_ptr<raft_storage> storage,
+                     std::shared_ptr<raft_state_machine> state_machine) :
 	m_id(id),
 	m_peers(peers),
 	m_state(node_state_e::FOLLOWER),
 	m_storage(storage),
+	m_state_machine(state_machine),
 	m_election_threshold(election_threshold),
 	m_election_timeout(0),
-	m_heartbeat_timeout(0)
+	m_heartbeat_timeout(0),
+	m_commit_index(0),
+	m_last_applied(0)
 {
 }
 
-raft_node::raft_node(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage) :
-	raft_node(id, peers, random_election_threshold(), storage) {};
+raft_node::raft_node(node_id_t id,
+                     std::vector<node_id_t> peers,
+                     std::shared_ptr<raft_storage> storage,
+                     std::shared_ptr<raft_state_machine> state_machine) :
+	raft_node(id, peers, random_election_threshold(), storage, state_machine) {};
 
 leader_term_t
 raft_node::get_last_log_term() const
@@ -158,6 +165,10 @@ raft_node::update_commit_index()
 	if (N > m_commit_index && N > 0 && m_storage->get_log_entry(N).term == m_storage->get_term()) {
 		m_commit_index = N;
 	}
+
+	while (m_last_applied < m_commit_index) {
+		m_state_machine->apply(m_storage->get_log_entry(++m_last_applied));
+	}
 }
 
 void
@@ -215,6 +226,10 @@ raft_node::handle(const append_entries_request& message)
 
 	if (message.leader_commit > m_commit_index) {
 		m_commit_index = std::min(m_storage->get_log_size(), message.leader_commit);
+	}
+
+	while (m_last_applied < m_commit_index) {
+		m_state_machine->apply(m_storage->get_log_entry(++m_last_applied));
 	}
 
 respond:
