@@ -10,7 +10,7 @@
 class raft_server
 {
 public:
-	raft_server(node_id_t id, std::vector<node_id_t> peers);
+	raft_server(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage_memory> storage);
 
 	raft_node::node_state_e get_state() const;
 	node_id_t get_id() const;

@@ -1,7 +1,7 @@
 #include "simulation/raft_server.hpp"
 
-raft_server::raft_server(node_id_t id, std::vector<node_id_t> peers) :
-	m_storage(std::make_shared<raft_storage_memory>()),
+raft_server::raft_server(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage_memory> storage) :
+	m_storage(storage),
 	m_node(id, std::move(peers), m_storage)
 {
 }
