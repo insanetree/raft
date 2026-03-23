@@ -49,6 +49,8 @@ public:
 
 	log_entry_index_t get_last_applied() const { return m_last_applied; }
 
+	node_id_t get_leader_id() const { return m_leader_id; }
+
 	void tick();
 
 	void step(const raft_message_t& message);
@@ -92,6 +94,7 @@ private:
 	size_t m_heartbeat_timeout;
 
 	// Volatile state
+	node_id_t m_leader_id;
 	log_entry_index_t m_commit_index;
 	log_entry_index_t m_last_applied;
 

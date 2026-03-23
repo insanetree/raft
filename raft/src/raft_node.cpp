@@ -28,6 +28,7 @@ raft_node::raft_node(node_id_t id,
 	m_election_threshold(election_threshold),
 	m_election_timeout(0),
 	m_heartbeat_timeout(0),
+	m_leader_id(INVALID_NODE_ID),
 	m_commit_index(0),
 	m_last_applied(0)
 {
@@ -61,11 +62,13 @@ raft_node::state_transition(node_state_e state)
 	m_heartbeat_timeout = 0;
 	m_election_timeout = 0;
 	if (state == node_state_e::LEADER) {
+		m_leader_id = m_id;
 		for (node_id_t peer : m_peers) {
 			m_next_index.emplace(peer, m_storage->get_log_size() + 1);
 			m_match_index.emplace(peer, 0);
 		}
 	} else if (state == node_state_e::CANDIDATE) {
+		m_leader_id = INVALID_NODE_ID;
 		m_received_votes.insert(m_id);
 	}
 
@@ -189,6 +192,7 @@ raft_node::handle(const append_entries_request& message)
 	}
 
 	m_election_timeout = 0;
+	m_leader_id = message.leader_id;
 
 	append_entries_response response = {.dest = message.leader_id,
 	                                    .follower_id = m_id,
