@@ -47,4 +47,10 @@ struct request_vote_response
 using raft_message_t =
 	std::variant<append_entries_request, append_entries_response, request_vote_request, request_vote_response>;
 
+static inline node_id_t
+get_dest(const raft_message_t& msg)
+{
+	return std::visit([](const auto& m) -> node_id_t { return m.dest; }, msg);
+}
+
 #endif

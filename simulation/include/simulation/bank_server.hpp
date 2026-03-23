@@ -16,7 +16,7 @@ constexpr account_id_t INVALID_ACCOUNT_ID = static_cast<account_id_t>(-1);
 class bank_server
 {
 public:
-	bank_server(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage);
+	bank_server(size_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage);
 
 	raft_node::node_state_e get_state() const;
 
@@ -26,12 +26,21 @@ public:
 
 	api_response_t transfer(account_id_t from, account_id_t to, size_t amount);
 
-private:
-	std::recursive_mutex m_mutex;
+	void drive_node();
 
-	std::shared_ptr<raft_storage> m_storage;
+private:
+	static void send_message(const raft_message_t& msg);
+	static std::vector<raft_message_t> get_messages(size_t id);
+
+	static std::mutex s_inbox_mutex;
+	static std::unordered_map<size_t, std::vector<raft_message_t>> s_inbox;
+
+	mutable std::mutex m_mutex;
+
+	std::size_t m_id;
+	std::vector<node_id_t> m_peers;
 	std::shared_ptr<raft_state_machine> m_state_machine;
-	raft_node m_node;
+	std::shared_ptr<raft_node> m_node;
 };
 
 #endif

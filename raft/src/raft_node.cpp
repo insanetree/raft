@@ -89,6 +89,7 @@ raft_node::update_term(const leader_term_t new_term)
 void
 raft_node::tick()
 {
+	const std::unique_lock lock{m_mutex};
 	switch (m_state) {
 	case node_state_e::FOLLOWER:
 	case node_state_e::CANDIDATE:
@@ -136,18 +137,8 @@ raft_node::send_heartbeats()
 	assert(m_state == node_state_e::LEADER);
 	m_heartbeat_timeout = 0;
 
-	append_entries_request msg = {.dest = 0,
-	                              .leader_term = m_storage->get_term(),
-	                              .leader_id = m_id,
-	                              .prev_log_index = 0,
-	                              .prev_log_term = 0,
-	                              .entries = {},
-	                              .leader_commit = m_commit_index};
 	for (node_id_t peer : m_peers) {
-		msg.dest = peer;
-		msg.prev_log_index = m_next_index.at(peer) - 1ul;
-		msg.prev_log_term = msg.prev_log_index ? m_storage->get_log_entry(msg.prev_log_index).term : 0ul;
-		m_outbox.push_back(msg);
+		append_entries(peer);
 	}
 }
 
@@ -172,6 +163,29 @@ raft_node::update_commit_index()
 	while (m_last_applied < m_commit_index) {
 		m_state_machine->apply(m_storage->get_log_entry(++m_last_applied));
 	}
+}
+
+void
+raft_node::append_entries(node_id_t follower_id)
+{
+	assert(m_state == node_state_e::LEADER);
+	assert(follower_id != m_id);
+	const log_entry_index_t last_log_entry = m_storage->get_log_size();
+	const log_entry_index_t prev_log_index = m_next_index.at(follower_id) - 1ul;
+	const leader_term_t prev_log_term = prev_log_index ? m_storage->get_log_entry(prev_log_index).term : 0ul;
+	append_entries_request msg = {.dest = follower_id,
+	                              .leader_term = m_storage->get_term(),
+	                              .leader_id = m_id,
+	                              .prev_log_index = prev_log_index,
+	                              .prev_log_term = prev_log_term,
+	                              .entries = {},
+	                              .leader_commit = m_commit_index};
+
+	// Note that we do <= here since indexing starts from 1
+	for (log_entry_index_t index = m_next_index.at(follower_id); index <= last_log_entry; index++) {
+		msg.entries.push_back(m_storage->get_log_entry(index));
+	}
+	m_outbox.push_back(std::move(msg));
 }
 
 void
@@ -256,6 +270,7 @@ raft_node::handle(const append_entries_response& message)
 
 	if (!message.success) {
 		m_next_index.at(message.follower_id) = std::max(m_next_index.at(message.follower_id) - 1ul, 1ul);
+		append_entries(message.follower_id);
 		return;
 	}
 
@@ -326,6 +341,7 @@ raft_node::handle(const request_vote_response& message)
 void
 raft_node::step(const raft_message_t& message)
 {
+	const std::unique_lock lock{m_mutex};
 	std::visit([this](const auto& m) { handle(m); }, message);
 }
 
@@ -338,7 +354,16 @@ raft_node::step(const std::vector<raft_message_t>& messages)
 std::vector<raft_message_t>
 raft_node::get_messages()
 {
+	const std::unique_lock lock{m_mutex};
 	std::vector<raft_message_t> sent_messages{std::move(m_outbox)};
 	m_outbox = {};
 	return sent_messages;
+}
+
+log_entry_index_t
+raft_node::append_log(std::vector<uint8_t> command)
+{
+	const std::unique_lock lock{m_mutex};
+	m_storage->push_log_entry({.term = m_storage->get_term(), .command = std::move(command)});
+	return m_storage->get_log_size();
 }

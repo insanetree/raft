@@ -15,6 +15,7 @@ class bank_balances : public raft_state_machine
 public:
 	void apply(log_entry_t log_entry) override
 	{
+		std::unique_lock lock{m_mutex};
 		assert(log_entry.command.size() == sizeof(bank_transaction));
 		bank_transaction tx = *reinterpret_cast<const bank_transaction*>(log_entry.command.data());
 
@@ -26,45 +27,55 @@ public:
 		m_balances[tx.to] += tx.amount;
 	}
 
-	size_t get_balance(account_id_t account_id) const { return m_balances.at(account_id); }
+	size_t get_balance(account_id_t account_id) const
+	{
+		std::unique_lock lock{m_mutex};
+		return m_balances.at(account_id);
+	}
 
 private:
+	mutable std::mutex m_mutex;
 	// map account ID -> balance
 	std::map<account_id_t, size_t> m_balances;
 };
 
-bank_server::bank_server(node_id_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage) :
-	m_storage(storage),
+std::mutex bank_server::s_inbox_mutex{};
+std::unordered_map<size_t, std::vector<raft_message_t>> bank_server::s_inbox{};
+
+bank_server::bank_server(size_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage) :
+	m_id(id),
+	m_peers(peers),
 	m_state_machine(std::make_shared<bank_balances>()),
-	m_node(id, std::move(peers), m_storage, m_state_machine)
+	m_node(std::make_shared<raft_node>(id, peers, storage, m_state_machine))
 {
+	std::lock_guard<std::mutex> lock{s_inbox_mutex};
+	s_inbox.emplace(id, std::vector<raft_message_t>{});
 }
 
 raft_node::node_state_e
 bank_server::get_state() const
 {
-	return m_node.get_state();
+	return m_node->get_state();
 }
 
 node_id_t
 bank_server::get_id() const
 {
-	return m_node.get_id();
+	return m_node->get_id();
 }
 
 api_response_t
 bank_server::open_account(account_id_t account_id)
 {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	std::lock_guard<std::mutex> lock(m_mutex);
 
-	if (m_node.get_state() != raft_node::node_state_e::LEADER) {
-		return {.type = api_response_type::REDIRECT, .redirect_to = m_node.get_leader_id()};
+	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
+		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
 
 	bank_transaction tx{.from = INVALID_ACCOUNT_ID, .to = account_id, .amount = 1000000ul};
 	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
-	log_entry_t entry{.term = m_node.get_term(), .command = {bytes, bytes + sizeof(tx)}};
-	m_storage->push_log_entry(entry);
+	m_node->append_log({bytes, bytes + sizeof(tx)});
 
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
 }
@@ -72,10 +83,10 @@ bank_server::open_account(account_id_t account_id)
 api_response_t
 bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	std::lock_guard<std::mutex> lock(m_mutex);
 
-	if (m_node.get_state() != raft_node::node_state_e::LEADER) {
-		return {.type = api_response_type::REDIRECT, .redirect_to = m_node.get_leader_id()};
+	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
+		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
 
 	size_t from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
@@ -85,8 +96,41 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 
 	bank_transaction tx{.from = from, .to = to, .amount = amount};
 	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
-	log_entry_t entry{.term = m_node.get_term(), .command = {bytes, bytes + sizeof(tx)}};
-	m_storage->push_log_entry(entry);
+	m_node->append_log({bytes, bytes + sizeof(tx)});
 
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
+}
+
+void
+bank_server::send_message(const raft_message_t& msg)
+{
+	std::lock_guard<std::mutex> lock{s_inbox_mutex};
+	s_inbox.at(get_dest(msg)).push_back(msg);
+}
+
+std::vector<raft_message_t>
+bank_server::get_messages(size_t id)
+{
+	std::lock_guard<std::mutex> lock{s_inbox_mutex};
+	std::vector<raft_message_t> recv{};
+	std::swap(recv, s_inbox.at(id));
+	return recv;
+}
+
+void
+bank_server::drive_node()
+{
+	std::vector<raft_message_t> messages = get_messages(m_node->get_id());
+	m_node->step(messages);
+	m_node->tick();
+	messages = m_node->get_messages();
+	for (const raft_message_t& msg : messages) {
+		send_message(msg);
+	}
+
+	// TODO: sleep and small chance to simulate node shutdown. In case of shutdown, empty the inbox, delete the raft
+	// node object, wait 10 seconds, create the new raft node object and again empty the inbox. Then the node is again
+	// operational. Note that the API calls can return error in that case. This routine will update the conditional
+	// variable where the api callers will sleep on. API callers will sleep on the conditional variable to wait until
+	// their command is commited.
 }

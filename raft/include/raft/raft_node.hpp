@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -37,19 +38,47 @@ public:
 
 	node_id_t get_id() const { return m_id; }
 
-	node_state_e get_state() const { return m_state; }
+	node_state_e get_state() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_state;
+	}
 
-	leader_term_t get_term() const { return m_storage->get_term(); };
+	leader_term_t get_term() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_storage->get_term();
+	};
 
-	node_id_t get_voted_for() const { return m_storage->get_voted_for(); }
+	node_id_t get_voted_for() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_storage->get_voted_for();
+	}
 
-	size_t get_election_threshold() const { return m_election_threshold; }
+	size_t get_election_threshold() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_election_threshold;
+	}
 
-	log_entry_index_t get_commit_index() const { return m_commit_index; }
+	log_entry_index_t get_commit_index() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_commit_index;
+	}
 
-	log_entry_index_t get_last_applied() const { return m_last_applied; }
+	log_entry_index_t get_last_applied() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_last_applied;
+	}
 
-	node_id_t get_leader_id() const { return m_leader_id; }
+	node_id_t get_leader_id() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_leader_id;
+	}
 
 	void tick();
 
@@ -58,6 +87,8 @@ public:
 	void step(const std::vector<raft_message_t>& messages);
 
 	std::vector<raft_message_t> get_messages();
+
+	log_entry_index_t append_log(std::vector<uint8_t> command);
 
 private:
 	static size_t random_election_threshold();
@@ -75,10 +106,15 @@ private:
 
 	void update_commit_index();
 
+	void append_entries(node_id_t follower_id);
+
 	void handle(const append_entries_request&);
 	void handle(const append_entries_response&);
 	void handle(const request_vote_request&);
 	void handle(const request_vote_response&);
+
+	// Mutex
+	mutable std::mutex m_mutex;
 
 	// Persistent state
 	const node_id_t m_id;
