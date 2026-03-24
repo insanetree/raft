@@ -6,6 +6,7 @@
 #include "raft/raft_storage_memory.hpp"
 #include "simulation/api_response.hpp"
 
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -36,6 +37,7 @@ private:
 	static std::unordered_map<size_t, std::vector<raft_message_t>> s_inbox;
 
 	mutable std::mutex m_mutex;
+	std::condition_variable server_tick;
 
 	std::size_t m_id;
 	std::vector<node_id_t> m_peers;

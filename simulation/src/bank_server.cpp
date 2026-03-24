@@ -67,38 +67,59 @@ bank_server::get_id() const
 api_response_t
 bank_server::open_account(account_id_t account_id)
 {
-	std::lock_guard<std::mutex> lock(m_mutex);
+	std::unique_lock<std::mutex> lock(m_mutex);
 
+	bank_transaction tx{.from = INVALID_ACCOUNT_ID, .to = account_id, .amount = 1000000ul};
+	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
+	log_entry_index_t log_index;
+
+	if (!m_node) {
+		goto return_error;
+	}
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
 		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
 
-	bank_transaction tx{.from = INVALID_ACCOUNT_ID, .to = account_id, .amount = 1000000ul};
-	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
-	m_node->append_log({bytes, bytes + sizeof(tx)});
+	log_index = m_node->append_log({bytes, bytes + sizeof(tx)});
+	server_tick.wait(lock, [&]() { return !m_node || m_node->get_commit_index() >= log_index; });
+	if (!m_node) {
+		goto return_error;
+	}
 
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
+return_error:
+	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
 }
 
 api_response_t
 bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 {
-	std::lock_guard<std::mutex> lock(m_mutex);
+	std::unique_lock<std::mutex> lock(m_mutex);
 
+	size_t from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
+	bank_transaction tx{.from = from, .to = to, .amount = amount};
+	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
+	log_entry_index_t log_index;
+
+	if (from_balance < amount) {
+		goto return_error;
+	}
+	if (!m_node) {
+		goto return_error;
+	}
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
 		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
 
-	size_t from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
-	if (from_balance < amount) {
-		return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
+	log_index = m_node->append_log({bytes, bytes + sizeof(tx)});
+	server_tick.wait(lock, [&]() { return !m_node || m_node->get_commit_index() >= log_index; });
+	if (!m_node) {
+		goto return_error;
 	}
 
-	bank_transaction tx{.from = from, .to = to, .amount = amount};
-	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
-	m_node->append_log({bytes, bytes + sizeof(tx)});
-
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
+return_error:
+	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
 }
 
 void
@@ -120,6 +141,7 @@ bank_server::get_messages(size_t id)
 void
 bank_server::drive_node()
 {
+	std::unique_lock<std::mutex> lock{m_mutex};
 	std::vector<raft_message_t> messages = get_messages(m_node->get_id());
 	m_node->step(messages);
 	m_node->tick();
@@ -127,6 +149,8 @@ bank_server::drive_node()
 	for (const raft_message_t& msg : messages) {
 		send_message(msg);
 	}
+
+	server_tick.notify_all();
 
 	// TODO: sleep and small chance to simulate node shutdown. In case of shutdown, empty the inbox, delete the raft
 	// node object, wait 10 seconds, create the new raft node object and again empty the inbox. Then the node is again
