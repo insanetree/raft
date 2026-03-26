@@ -45,6 +45,7 @@ std::unordered_map<size_t, std::vector<raft_message_t>> bank_server::s_inbox{};
 bank_server::bank_server(size_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage) :
 	m_id(id),
 	m_peers(peers),
+	m_storage(storage),
 	m_state_machine(std::make_shared<bank_balances>()),
 	m_node(std::make_shared<raft_node>(id, peers, storage, m_state_machine))
 {
@@ -141,6 +142,7 @@ bank_server::get_messages(size_t id)
 void
 bank_server::drive_node()
 {
+
 	std::unique_lock<std::mutex> lock{m_mutex};
 	std::vector<raft_message_t> messages = get_messages(m_node->get_id());
 	m_node->step(messages);
@@ -157,4 +159,19 @@ bank_server::drive_node()
 	// operational. Note that the API calls can return error in that case. This routine will update the conditional
 	// variable where the api callers will sleep on. API callers will sleep on the conditional variable to wait until
 	// their command is commited.
+	thread_local std::random_device rd;
+	thread_local std::mt19937_64 rng{rd()};
+	thread_local std::uniform_int_distribution<uint64_t> un{0, 10000};
+	// if 0 is rolled, shut down the server
+	if (!un(rng)) {
+		m_node.reset();
+		m_state_machine.reset();
+		lock.unlock();
+		std::this_thread::sleep_for(std::chrono::seconds(10));
+		lock.lock();
+		m_state_machine = std::make_shared<bank_balances>();
+		m_node = std::make_shared<raft_node>(m_id, m_peers, m_storage, m_state_machine);
+		// discard any received messages
+		get_messages(m_id);
+	}
 }

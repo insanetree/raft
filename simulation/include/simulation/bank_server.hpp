@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <vector>
 
 using account_id_t = size_t;
@@ -41,6 +42,7 @@ private:
 
 	std::size_t m_id;
 	std::vector<node_id_t> m_peers;
+	std::shared_ptr<raft_storage> m_storage;
 	std::shared_ptr<raft_state_machine> m_state_machine;
 	std::shared_ptr<raft_node> m_node;
 };
