@@ -23,7 +23,10 @@ public:
 
 	node_id_t get_id() const;
 
+	static constexpr size_t STARTING_BALANCE = 100000ul;
 	api_response_t open_account(account_id_t account_id);
+
+	size_t get_balance(account_id_t account_id);
 
 	api_response_t transfer(account_id_t from, account_id_t to, size_t amount);
 
@@ -32,6 +35,12 @@ public:
 		std::unique_lock<std::mutex> lock{m_mutex};
 		m_run = false;
 	};
+
+	void stop_simulation_failures()
+	{
+		std::unique_lock<std::mutex> lock{m_mutex};
+		m_simulate_failures = false;
+	}
 
 	void drive_node();
 
@@ -45,6 +54,7 @@ private:
 	mutable std::mutex m_mutex;
 	std::condition_variable server_tick;
 	bool m_run;
+	bool m_simulate_failures;
 
 	std::size_t m_id;
 	std::vector<node_id_t> m_peers;

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <map>
 #include <random>
+#include <thread>
 
 struct bank_transaction
 {
@@ -45,6 +46,7 @@ std::unordered_map<size_t, std::vector<raft_message_t>> bank_server::s_inbox{};
 
 bank_server::bank_server(size_t id, std::vector<node_id_t> peers, std::shared_ptr<raft_storage> storage) :
 	m_run(true),
+	m_simulate_failures(true),
 	m_id(id),
 	m_peers(peers),
 	m_storage(storage),
@@ -72,7 +74,7 @@ bank_server::open_account(account_id_t account_id)
 {
 	std::unique_lock<std::mutex> lock(m_mutex);
 
-	bank_transaction tx{.from = INVALID_ACCOUNT_ID, .to = account_id, .amount = 1000000ul};
+	bank_transaction tx{.from = INVALID_ACCOUNT_ID, .to = account_id, .amount = STARTING_BALANCE};
 	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
 	log_entry_index_t log_index;
 
@@ -92,6 +94,13 @@ bank_server::open_account(account_id_t account_id)
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
 return_error:
 	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
+}
+
+size_t
+bank_server::get_balance(account_id_t account_id)
+{
+	std::unique_lock<std::mutex> lock(m_mutex);
+	return std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(account_id);
 }
 
 api_response_t
@@ -145,6 +154,7 @@ void
 bank_server::drive_node()
 {
 	while (m_run) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		std::unique_lock<std::mutex> lock{m_mutex};
 		std::vector<raft_message_t> messages = get_messages(m_node->get_id());
 		m_node->step(messages);
@@ -160,7 +170,7 @@ bank_server::drive_node()
 		static thread_local std::mt19937_64 rng{rd()};
 		static thread_local std::uniform_int_distribution<uint64_t> un{0, 10000};
 		// if 0 is rolled, shut down the server
-		if (!un(rng)) {
+		if (!un(rng) && m_simulate_failures) {
 			m_node.reset();
 			m_state_machine.reset();
 			lock.unlock();

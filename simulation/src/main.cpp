@@ -2,6 +2,7 @@
 #include "simulation/bank_client.hpp"
 #include "simulation/bank_server.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <thread>
@@ -35,8 +36,32 @@ main()
 	std::for_each(g_server_array.begin(), g_server_array.end(), [&threads_array](std::shared_ptr<bank_server> server) {
 		threads_array.emplace_back([server]() { server->drive_node(); });
 	});
+	std::this_thread::sleep_for(std::chrono::seconds(5));
 	std::for_each(g_client_array.begin(), g_client_array.end(), [&threads_array](std::shared_ptr<bank_client> client) {
 		threads_array.emplace_back([client]() { client->drive_client(); });
 	});
+
+	// let clients run for a bit
+	std::this_thread::sleep_for(std::chrono::seconds(30));
+
+	// stop server failures
+	std::for_each(g_server_array.begin(), g_server_array.end(), [](std::shared_ptr<bank_server> server) {
+		server->stop_simulation_failures();
+	});
+
+	// wait for stabilization
+	std::this_thread::sleep_for(std::chrono::seconds(5));
+
+	// stop clients
+	std::for_each(
+		g_client_array.begin(), g_client_array.end(), [](std::shared_ptr<bank_client> client) { client->stop(); });
+
+	// stop servers
+	std::for_each(
+		g_server_array.begin(), g_server_array.end(), [](std::shared_ptr<bank_server> server) { server->stop(); });
+
+	// wait for clients and servers to stop
+	std::for_each(threads_array.begin(), threads_array.end(), [](std::jthread& thread) { thread.join(); });
+
 	return 0;
 }

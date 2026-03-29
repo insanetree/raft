@@ -3,6 +3,7 @@
 
 #include "simulation/bank_server.hpp"
 
+#include <random>
 #include <span>
 
 class bank_client
@@ -26,11 +27,17 @@ public:
 		m_run = false;
 	};
 
+	void transfer(size_t amount);
+
 private:
-	static std::vector<const bank_client*> s_clients;
+	void random_transfer();
+
+	static std::vector<bank_client*> s_clients;
 	static account_id_t s_next_account_id;
 
 	mutable std::mutex m_mutex;
+	std::random_device m_rd;
+	std::mt19937_64 m_rng;
 
 	bool m_run;
 	account_id_t m_account_id;
@@ -38,7 +45,7 @@ private:
 
 	std::span<std::shared_ptr<bank_server>> m_servers;
 	std::shared_ptr<bank_server> m_leader_server;
-	std::vector<const bank_client*> m_peers;
+	std::vector<bank_client*> m_peers;
 };
 
 #endif

@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <cassert>
+#include <thread>
 
-std::vector<const bank_client*> bank_client::s_clients;
+std::vector<bank_client*> bank_client::s_clients;
 account_id_t bank_client::s_next_account_id = 1ul;
 
 bank_client::bank_client(std::span<std::shared_ptr<bank_server>> servers) :
+	m_rd(),
+	m_rng(m_rd()),
 	m_run(true),
 	m_account_id(s_next_account_id++),
 	m_servers(servers),
@@ -20,16 +23,70 @@ bank_client::bank_client(std::span<std::shared_ptr<bank_server>> servers) :
 }
 
 void
+bank_client::transfer(size_t amount)
+{
+	std::unique_lock<std::mutex> lock{m_mutex};
+	m_balance += amount;
+}
+
+void
+bank_client::random_transfer()
+{
+	if (m_balance == 0) {
+		return;
+	}
+
+	std::unique_lock<std::mutex> lock{m_mutex};
+	std::uniform_int_distribution<size_t> dist(1, m_balance);
+	size_t amount = dist(m_rng);
+	bank_client* peer = m_peers[m_rng() % m_peers.size()];
+	m_balance -= amount;
+	lock.unlock(); // need to unlock this to avoid deadlock when peer transfers
+	peer->transfer(amount);
+
+	api_response_t resp;
+	do {
+		resp = m_leader_server->transfer(m_account_id, peer->get_id(), amount);
+		if (resp.type == api_response_type::REDIRECT) {
+			if (resp.redirect_to != INVALID_NODE_ID) {
+				m_leader_server = m_servers[resp.redirect_to - 1];
+			} else {
+				m_leader_server = m_servers[m_rng() % m_servers.size()];
+			}
+		}
+	} while (resp.type != api_response_type::SUCCESS);
+}
+
+void
 bank_client::drive_client()
 {
-	std::copy_if(s_clients.begin(), s_clients.end(), std::back_inserter(m_peers), [&](const bank_client* obj) {
-		return obj != this;
-	});
+	std::copy_if(
+		s_clients.begin(), s_clients.end(), std::back_inserter(m_peers), [&](bank_client* obj) { return obj != this; });
 
 	// TODO: Register to a server with the account_id. Get the initial balance. In a loop begin transfering money to the
 	// peers by using the servers. Notify the peer of transfer so peers update their balance independently of servers.
 	// At the end check if the values match.
+	api_response_t resp;
+	do {
+		resp = m_leader_server->open_account(m_account_id);
+		if (resp.type == api_response_type::REDIRECT) {
+			if (resp.redirect_to != INVALID_NODE_ID) {
+				m_leader_server = m_servers[resp.redirect_to - 1];
+			} else {
+				m_leader_server = m_servers[m_rng() % m_servers.size()];
+			}
+		}
+	} while (resp.type != api_response_type::SUCCESS);
+	m_balance = bank_server::STARTING_BALANCE;
 
 	while (m_run) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		random_transfer();
 	}
+
+	// wait for servers to stabilize
+	std::this_thread::sleep_for(std::chrono::seconds(5));
+
+	size_t final_balance = m_leader_server->get_balance(m_account_id);
+	assert(final_balance == m_balance);
 }
