@@ -3,13 +3,12 @@
 
 #include "raft/raft_node.hpp"
 #include "raft/raft_state_machine.hpp"
-#include "raft/raft_storage_memory.hpp"
+#include "raft/raft_storage.hpp"
 #include "simulation/api_response.hpp"
 
 #include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <random>
 #include <vector>
 
 using account_id_t = size_t;
@@ -28,6 +27,12 @@ public:
 
 	api_response_t transfer(account_id_t from, account_id_t to, size_t amount);
 
+	void stop()
+	{
+		std::unique_lock<std::mutex> lock{m_mutex};
+		m_run = false;
+	};
+
 	void drive_node();
 
 private:
@@ -39,12 +44,13 @@ private:
 
 	mutable std::mutex m_mutex;
 	std::condition_variable server_tick;
+	bool m_run;
 
 	std::size_t m_id;
 	std::vector<node_id_t> m_peers;
 	std::shared_ptr<raft_storage> m_storage;
 	std::shared_ptr<raft_state_machine> m_state_machine;
-	std::shared_ptr<raft_node> m_node;
+	std::unique_ptr<raft_node> m_node;
 };
 
 #endif

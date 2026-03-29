@@ -1,12 +1,17 @@
+#include "raft/raft_storage_memory.hpp"
+#include "simulation/bank_client.hpp"
 #include "simulation/bank_server.hpp"
 
+#include <array>
 #include <cstdio>
+#include <thread>
 #include <vector>
 
 constexpr size_t CLUSTER_SIZE = 5;
-std::vector<std::shared_ptr<raft_storage>> g_storage_array(CLUSTER_SIZE, nullptr);
-std::vector<std::shared_ptr<bank_server>> g_server_array(CLUSTER_SIZE, nullptr);
-std::vector<raft_message_t> g_message_queue;
+constexpr size_t CLIENT_NUM = 10;
+std::array<std::shared_ptr<raft_storage>, CLUSTER_SIZE> g_storage_array{};
+std::array<std::shared_ptr<bank_server>, CLUSTER_SIZE> g_server_array{};
+std::array<std::shared_ptr<bank_client>, CLIENT_NUM> g_client_array{};
 
 int
 main()
@@ -21,8 +26,17 @@ main()
 		}
 		g_server_array[i] = std::make_shared<bank_server>(i + 1, peers, g_storage_array[i]);
 	}
-	std::printf("Server %zu started in state %d\n",
-	            g_server_array[0]->get_id(),
-	            static_cast<int>(g_server_array[0]->get_state()));
+
+	for (size_t i = 0; i < CLIENT_NUM; i++) {
+		g_client_array[i] = std::make_shared<bank_client>(std::span(g_server_array));
+	}
+
+	std::vector<std::jthread> threads_array;
+	std::for_each(g_server_array.begin(), g_server_array.end(), [&threads_array](std::shared_ptr<bank_server> server) {
+		threads_array.emplace_back([server]() { server->drive_node(); });
+	});
+	std::for_each(g_client_array.begin(), g_client_array.end(), [&threads_array](std::shared_ptr<bank_client> client) {
+		threads_array.emplace_back([client]() { client->drive_client(); });
+	});
 	return 0;
 }

@@ -1,4 +1,5 @@
 add_library(simulation_lib STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/bank_client.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bank_server.cpp
 )
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "raft/raft_storage_memory.hpp"
 #include "simulation/bank_server.hpp"
 
 TEST(BankServerTest, InitialStateIsFollower)
