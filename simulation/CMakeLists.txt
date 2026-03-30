@@ -4,7 +4,7 @@ add_library(simulation_lib STATIC
 )
 
 target_include_directories(simulation_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(simulation_lib PUBLIC raft)
+target_link_libraries(simulation_lib PUBLIC raft logging)
 set_project_warnings(simulation_lib)
 
 add_executable(simulation

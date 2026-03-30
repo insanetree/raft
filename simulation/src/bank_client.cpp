@@ -1,4 +1,5 @@
 #include "simulation/bank_client.hpp"
+#include "spdlog/spdlog.h"
 
 #include <algorithm>
 #include <cassert>
@@ -47,7 +48,7 @@ bank_client::random_transfer()
 	api_response_t resp;
 	do {
 		resp = m_leader_server->transfer(m_account_id, peer->get_id(), amount);
-		if (resp.type == api_response_type::REDIRECT) {
+		if (resp.type != api_response_type::SUCCESS) {
 			if (resp.redirect_to != INVALID_NODE_ID) {
 				m_leader_server = m_servers[resp.redirect_to - 1];
 			} else {
@@ -60,6 +61,7 @@ bank_client::random_transfer()
 void
 bank_client::drive_client()
 {
+	spdlog::info("CLIENT {}: online", m_account_id);
 	std::copy_if(
 		s_clients.begin(), s_clients.end(), std::back_inserter(m_peers), [&](bank_client* obj) { return obj != this; });
 
@@ -70,7 +72,7 @@ bank_client::drive_client()
 	size_t balance;
 	do {
 		resp = m_leader_server->open_account(m_account_id);
-		if (resp.type == api_response_type::REDIRECT) {
+		if (resp.type != api_response_type::SUCCESS) {
 			if (resp.redirect_to != INVALID_NODE_ID) {
 				m_leader_server = m_servers[resp.redirect_to - 1];
 			} else {
@@ -80,7 +82,7 @@ bank_client::drive_client()
 	} while (resp.type != api_response_type::SUCCESS);
 	do {
 		resp = m_leader_server->get_balance(m_account_id, balance);
-		if (resp.type == api_response_type::REDIRECT) {
+		if (resp.type != api_response_type::SUCCESS) {
 			if (resp.redirect_to != INVALID_NODE_ID) {
 				m_leader_server = m_servers[resp.redirect_to - 1];
 			} else {
@@ -94,13 +96,14 @@ bank_client::drive_client()
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		random_transfer();
 	}
+	spdlog::info("CLIENT {}: stopping", m_account_id);
 
 	// wait for servers to stabilize
 	std::this_thread::sleep_for(std::chrono::seconds(5));
 
 	do {
 		resp = m_leader_server->get_balance(m_account_id, balance);
-		if (resp.type == api_response_type::REDIRECT) {
+		if (resp.type != api_response_type::SUCCESS) {
 			if (resp.redirect_to != INVALID_NODE_ID) {
 				m_leader_server = m_servers[resp.redirect_to - 1];
 			} else {

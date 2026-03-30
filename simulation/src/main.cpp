@@ -1,6 +1,7 @@
 #include "raft/raft_storage_memory.hpp"
 #include "simulation/bank_client.hpp"
 #include "simulation/bank_server.hpp"
+#include "spdlog/spdlog.h"
 
 #include <algorithm>
 #include <array>
@@ -17,6 +18,8 @@ std::array<std::shared_ptr<bank_client>, CLIENT_NUM> g_client_array{};
 int
 main()
 {
+	spdlog::set_level(spdlog::level::info);
+	spdlog::info("Starting simulation");
 	for (size_t i = 0; i < CLUSTER_SIZE; i++) {
 		g_storage_array[i] = std::make_shared<raft_storage_memory>();
 		std::vector<node_id_t> peers;

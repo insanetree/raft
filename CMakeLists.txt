@@ -49,5 +49,15 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(googletest)
 
+FetchContent_Declare(
+    spdlog
+    URL https://github.com/gabime/spdlog/archive/refs/tags/v1.13.0.zip
+)
+
+FetchContent_MakeAvailable(spdlog)
+
+add_library(logging INTERFACE)
+target_link_libraries(logging INTERFACE spdlog::spdlog)
+
 add_subdirectory(raft)
 add_subdirectory(simulation)
