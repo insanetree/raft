@@ -299,3 +299,14 @@ TEST_F(RaftNodeTest, CandidateRestartsElection)
 
 	EXPECT_EQ(node.get_term(), 2);
 }
+
+TEST_F(RaftNodeTest, SingleNodeCanBecomeLeader)
+{
+	raft_node node(id, {}, 3, m_storage, m_state_machine);
+
+	for (int i = 0; i < 4; i++) {
+		node.tick();
+	}
+
+	EXPECT_EQ(node.get_state(), raft_node::node_state_e::LEADER);
+}

@@ -26,7 +26,7 @@ public:
 	static constexpr size_t STARTING_BALANCE = 100000ul;
 	api_response_t open_account(account_id_t account_id);
 
-	size_t get_balance(account_id_t account_id);
+	api_response_t get_balance(account_id_t account_id, size_t& out_balance);
 
 	api_response_t transfer(account_id_t from, account_id_t to, size_t amount);
 

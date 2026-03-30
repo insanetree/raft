@@ -96,11 +96,17 @@ return_error:
 	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
 }
 
-size_t
-bank_server::get_balance(account_id_t account_id)
+api_response_t
+bank_server::get_balance(account_id_t account_id, size_t& out_balance)
 {
 	std::unique_lock<std::mutex> lock(m_mutex);
-	return std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(account_id);
+	if (!m_node || !m_state_machine) {
+		goto return_error;
+	}
+	out_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(account_id);
+	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
+return_error:
+	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
 }
 
 api_response_t
@@ -108,17 +114,21 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 {
 	std::unique_lock<std::mutex> lock(m_mutex);
 
-	size_t from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
+	size_t from_balance;
 	bank_transaction tx{.from = from, .to = to, .amount = amount};
 	const auto* bytes = reinterpret_cast<const uint8_t*>(&tx);
 	log_entry_index_t log_index;
 
+	if (!m_node || !m_state_machine) {
+		goto return_error;
+	}
+
+	from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
+
 	if (from_balance < amount) {
 		goto return_error;
 	}
-	if (!m_node) {
-		goto return_error;
-	}
+
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
 		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}

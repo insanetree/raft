@@ -67,6 +67,7 @@ bank_client::drive_client()
 	// peers by using the servers. Notify the peer of transfer so peers update their balance independently of servers.
 	// At the end check if the values match.
 	api_response_t resp;
+	size_t balance;
 	do {
 		resp = m_leader_server->open_account(m_account_id);
 		if (resp.type == api_response_type::REDIRECT) {
@@ -77,7 +78,17 @@ bank_client::drive_client()
 			}
 		}
 	} while (resp.type != api_response_type::SUCCESS);
-	m_balance = bank_server::STARTING_BALANCE;
+	do {
+		resp = m_leader_server->get_balance(m_account_id, balance);
+		if (resp.type == api_response_type::REDIRECT) {
+			if (resp.redirect_to != INVALID_NODE_ID) {
+				m_leader_server = m_servers[resp.redirect_to - 1];
+			} else {
+				m_leader_server = m_servers[m_rng() % m_servers.size()];
+			}
+		}
+	} while (resp.type != api_response_type::SUCCESS);
+	m_balance = balance;
 
 	while (m_run) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -87,6 +98,15 @@ bank_client::drive_client()
 	// wait for servers to stabilize
 	std::this_thread::sleep_for(std::chrono::seconds(5));
 
-	size_t final_balance = m_leader_server->get_balance(m_account_id);
-	assert(final_balance == m_balance);
+	do {
+		resp = m_leader_server->get_balance(m_account_id, balance);
+		if (resp.type == api_response_type::REDIRECT) {
+			if (resp.redirect_to != INVALID_NODE_ID) {
+				m_leader_server = m_servers[resp.redirect_to - 1];
+			} else {
+				m_leader_server = m_servers[m_rng() % m_servers.size()];
+			}
+		}
+	} while (resp.type != api_response_type::SUCCESS);
+	assert(balance == m_balance);
 }

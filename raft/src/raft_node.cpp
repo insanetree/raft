@@ -105,6 +105,12 @@ raft_node::tick()
 		}
 		break;
 	}
+
+	// Needed for special case where there is only one node in a cluster
+	if (m_received_votes.size() > m_peers.size() / 2) {
+		state_transition(node_state_e::LEADER);
+		send_heartbeats();
+	}
 }
 
 void
