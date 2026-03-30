@@ -26,6 +26,7 @@ function(set_project_warnings target)
         -Wformat=2
         -Wimplicit-fallthrough
         -Wmisleading-indentation
+        -fsanitize=thread
     )
 
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -36,6 +37,9 @@ function(set_project_warnings target)
             -Wuseless-cast
         )
     endif()
+    target_link_options(${target} PRIVATE
+        -fsanitize=thread
+    )
 endfunction()
 
 enable_testing()

@@ -62,6 +62,8 @@ bank_server::bank_server(size_t id, std::vector<node_id_t> peers, std::shared_pt
 raft_node::node_state_e
 bank_server::get_state() const
 {
+	std::unique_lock<std::mutex> lock{m_mutex};
+	server_tick.wait(lock, [&]() { return m_node != nullptr; });
 	return m_node->get_state();
 }
 

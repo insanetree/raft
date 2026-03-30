@@ -1,5 +1,5 @@
 add_executable(simulation_tests
-    bank_server_test.cpp
+    bank_server_single_test.cpp
 )
 
 target_link_libraries(simulation_tests

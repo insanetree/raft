@@ -103,6 +103,7 @@ raft_node::tick()
 		if (m_heartbeat_timeout > heartbeat_threshold) {
 			send_heartbeats();
 		}
+		update_commit_index();
 		break;
 	}
 

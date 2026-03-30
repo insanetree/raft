@@ -33,11 +33,10 @@ bank_client::transfer(size_t amount)
 void
 bank_client::random_transfer()
 {
+	std::unique_lock<std::mutex> lock{m_mutex};
 	if (m_balance == 0) {
 		return;
 	}
-
-	std::unique_lock<std::mutex> lock{m_mutex};
 	std::uniform_int_distribution<size_t> dist(1, m_balance);
 	size_t amount = dist(m_rng);
 	bank_client* peer = m_peers[m_rng() % m_peers.size()];

@@ -52,7 +52,7 @@ private:
 	static std::unordered_map<size_t, std::vector<raft_message_t>> s_inbox;
 
 	mutable std::mutex m_mutex;
-	std::condition_variable server_tick;
+	mutable std::condition_variable server_tick;
 	bool m_run;
 	bool m_simulate_failures;
 
