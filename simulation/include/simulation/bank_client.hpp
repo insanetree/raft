@@ -13,13 +13,15 @@ public:
 	bank_client(const bank_client&) = delete;
 	bank_client(bank_client&&) = delete;
 
-	account_id_t get_id() const
-	{
-		std::unique_lock<std::mutex> lock{m_mutex};
-		return m_account_id;
-	}
+	account_id_t get_id() const { return m_account_id; }
 
 	void drive_client();
+
+	bool get_run() const
+	{
+		std::unique_lock<std::mutex> lock{m_mutex};
+		return m_run;
+	}
 
 	void stop()
 	{

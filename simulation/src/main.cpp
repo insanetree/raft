@@ -59,6 +59,9 @@ main()
 	std::for_each(
 		g_client_array.begin(), g_client_array.end(), [](std::shared_ptr<bank_client> client) { client->stop(); });
 
+	// wait for stabilization
+	std::this_thread::sleep_for(std::chrono::seconds(5));
+
 	// stop servers
 	std::for_each(
 		g_server_array.begin(), g_server_array.end(), [](std::shared_ptr<bank_server> server) { server->stop(); });

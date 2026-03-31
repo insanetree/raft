@@ -30,6 +30,12 @@ public:
 
 	api_response_t transfer(account_id_t from, account_id_t to, size_t amount);
 
+	bool get_run() const
+	{
+		std::unique_lock<std::mutex> lock{m_mutex};
+		return m_run;
+	}
+
 	void stop()
 	{
 		std::unique_lock<std::mutex> lock{m_mutex};

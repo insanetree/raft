@@ -167,8 +167,8 @@ bank_server::get_messages(size_t id)
 void
 bank_server::drive_node()
 {
-	spdlog::info("SERVER {} ONLINE", m_id);
-	while (m_run) {
+	spdlog::info("SERVER {}: online", m_id);
+	while (get_run()) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		std::unique_lock<std::mutex> lock{m_mutex};
 		std::vector<raft_message_t> messages = get_messages(m_node->get_id());
@@ -183,7 +183,7 @@ bank_server::drive_node()
 
 		static thread_local std::random_device rd;
 		static thread_local std::mt19937_64 rng{rd()};
-		static thread_local std::uniform_int_distribution<uint64_t> un{0, 1000000};
+		static thread_local std::uniform_int_distribution<uint64_t> un{0, 10000};
 		// if 0 is rolled, shut down the server
 		if (!un(rng) && m_simulate_failures) {
 			spdlog::info("SERVER {}: simulating failure", m_id);
