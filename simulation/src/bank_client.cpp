@@ -101,16 +101,18 @@ bank_client::drive_client()
 
 	// wait for servers to stabilize
 	std::this_thread::sleep_for(std::chrono::seconds(5));
-
-	do {
-		resp = m_leader_server->get_balance(m_account_id, balance);
-		if (resp.type != api_response_type::SUCCESS) {
-			if (resp.redirect_to != INVALID_NODE_ID) {
-				m_leader_server = m_servers[resp.redirect_to - 1];
-			} else {
-				m_leader_server = m_servers[m_rng() % m_servers.size()];
+	{
+		std::unique_lock<std::mutex> lock{m_mutex};
+		do {
+			resp = m_leader_server->get_balance(m_account_id, balance);
+			if (resp.type != api_response_type::SUCCESS) {
+				if (resp.redirect_to != INVALID_NODE_ID) {
+					m_leader_server = m_servers[resp.redirect_to - 1];
+				} else {
+					m_leader_server = m_servers[m_rng() % m_servers.size()];
+				}
 			}
-		}
-	} while (resp.type != api_response_type::SUCCESS);
-	assert(balance == m_balance);
+		} while (resp.type != api_response_type::SUCCESS);
+		assert(balance == m_balance);
+	}
 }
