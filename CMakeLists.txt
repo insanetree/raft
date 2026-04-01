@@ -55,7 +55,7 @@ FetchContent_MakeAvailable(googletest)
 
 FetchContent_Declare(
     spdlog
-    URL https://github.com/gabime/spdlog/archive/refs/tags/v1.13.0.zip
+    URL https://github.com/gabime/spdlog/archive/refs/tags/v1.17.0.zip
 )
 
 FetchContent_MakeAvailable(spdlog)

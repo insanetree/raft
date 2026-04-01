@@ -3,6 +3,8 @@
 #include "raft/raft_storage_memory.hpp"
 #include "simulation/bank_server.hpp"
 
+#include <thread>
+
 class BankServerSingleTest : public ::testing::Test
 {
 protected:
