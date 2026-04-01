@@ -242,6 +242,7 @@ raft_node::handle(const append_entries_request& message)
 	}
 
 	response.success = true;
+	response.prev_log_index = m_storage->get_log_size();
 
 	for (const log_entry_t& entry : message.entries) {
 		m_storage->push_log_entry(entry);

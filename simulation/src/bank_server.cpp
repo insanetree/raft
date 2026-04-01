@@ -107,6 +107,9 @@ bank_server::get_balance(account_id_t account_id, size_t& out_balance)
 	if (!m_node || !m_state_machine) {
 		goto return_error;
 	}
+	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
+		goto return_error;
+	}
 	out_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(account_id);
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
 return_error:
@@ -183,14 +186,14 @@ bank_server::drive_node()
 
 		static thread_local std::random_device rd;
 		static thread_local std::mt19937_64 rng{rd()};
-		static thread_local std::uniform_int_distribution<uint64_t> un{0, 100000};
+		static thread_local std::uniform_int_distribution<uint64_t> un{0, 10000};
 		// if 0 is rolled, shut down the server
 		if (!un(rng) && m_simulate_failures) {
 			spdlog::info("SERVER {}: simulating failure", m_id);
 			m_node.reset();
 			m_state_machine.reset();
 			lock.unlock();
-			std::this_thread::sleep_for(std::chrono::seconds(2));
+			std::this_thread::sleep_for(std::chrono::seconds(1));
 			lock.lock();
 			spdlog::info("SERVER {}: back online", m_id);
 			m_state_machine = std::make_shared<bank_balances>();
