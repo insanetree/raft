@@ -108,8 +108,9 @@ bank_server::get_balance(account_id_t account_id, size_t& out_balance)
 		goto return_error;
 	}
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
-		goto return_error;
+		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
+
 	out_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(account_id);
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
 return_error:

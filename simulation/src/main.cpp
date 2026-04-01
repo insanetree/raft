@@ -39,13 +39,13 @@ main()
 	std::for_each(g_server_array.begin(), g_server_array.end(), [&threads_array](std::shared_ptr<bank_server> server) {
 		threads_array.emplace_back([server]() { server->drive_node(); });
 	});
-	std::this_thread::sleep_for(std::chrono::seconds(5));
+	std::this_thread::sleep_for(std::chrono::seconds(1));
 	std::for_each(g_client_array.begin(), g_client_array.end(), [&threads_array](std::shared_ptr<bank_client> client) {
 		threads_array.emplace_back([client]() { client->drive_client(); });
 	});
 
 	// let clients run for a bit
-	std::this_thread::sleep_for(std::chrono::seconds(30));
+	std::this_thread::sleep_for(std::chrono::seconds(60));
 
 	// stop server failures
 	std::for_each(g_server_array.begin(), g_server_array.end(), [](std::shared_ptr<bank_server> server) {
@@ -53,7 +53,7 @@ main()
 	});
 
 	// wait for stabilization
-	std::this_thread::sleep_for(std::chrono::seconds(5));
+	std::this_thread::sleep_for(std::chrono::seconds(10));
 
 	// stop clients
 	std::for_each(
@@ -68,6 +68,10 @@ main()
 
 	// wait for clients and servers to stop
 	std::for_each(threads_array.begin(), threads_array.end(), [](std::jthread& thread) { thread.join(); });
+
+	assert(std::all_of(&g_storage_array[1],
+	                   &g_storage_array[CLUSTER_SIZE - 1],
+	                   [](std::shared_ptr<raft_storage> storage) { return storage == g_storage_array[0]; }));
 
 	return 0;
 }

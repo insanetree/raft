@@ -108,7 +108,7 @@ raft_node::tick()
 	}
 
 	// Needed for special case where there is only one node in a cluster
-	if (m_received_votes.size() > m_peers.size() / 2) {
+	if (m_received_votes.size() > (m_peers.size() + 1) / 2) {
 		state_transition(node_state_e::LEADER);
 		send_heartbeats();
 	}
@@ -200,67 +200,96 @@ raft_node::handle(const append_entries_request& message)
 {
 	assert(message.dest == m_id);
 
+	append_entries_response response = {.dest = message.leader_id,
+	                                    .follower_id = m_id,
+	                                    .term = m_storage->get_term(),
+	                                    .success = false,
+	                                    .prev_log_index = 0,
+	                                    .count = 0};
+
+	// 1. Reply false if term < currentTerm
+	if (message.leader_term < m_storage->get_term()) {
+		m_outbox.push_back(response);
+		return;
+	}
+
+	// 2. If term is newer step down
 	if (message.leader_term > m_storage->get_term()) {
 		update_term(message.leader_term);
 	}
 
-	if (message.leader_term == m_storage->get_term() && m_state == node_state_e::CANDIDATE) {
-		state_transition(node_state_e::FOLLOWER);
-	}
-
+	// Convert candidate to follower if needed
 	if (m_state != node_state_e::FOLLOWER) {
-		return;
+		state_transition(node_state_e::FOLLOWER);
 	}
 
 	m_election_timeout = 0;
 	m_leader_id = message.leader_id;
 
-	append_entries_response response = {.dest = message.leader_id,
-	                                    .follower_id = m_id,
-	                                    .term = m_storage->get_term(),
-	                                    .success = false,
-	                                    .prev_log_index = m_storage->get_log_size(),
-	                                    .count = 0ul};
-
-	if (message.leader_term < m_storage->get_term()) {
-		response.success = false;
-		goto respond;
-	}
-
+	// 3. Check if log contains matching prev entry
 	if (message.prev_log_index > m_storage->get_log_size()) {
-		response.success = false;
-		goto respond;
+		response.prev_log_index = m_storage->get_log_size();
+		m_outbox.push_back(response);
+		return;
 	}
 
-	if (message.prev_log_index > 0 && m_storage->get_log_entry(message.prev_log_index).term != message.prev_log_term) {
-		response.success = false;
-		goto respond;
+	if (message.prev_log_index > 0) {
+		auto local_term = m_storage->get_log_entry(message.prev_log_index).term;
+		if (local_term != message.prev_log_term) {
+			response.prev_log_index = message.prev_log_index - 1;
+			m_outbox.push_back(response);
+			return;
+		}
 	}
 
-	while (message.prev_log_index < m_storage->get_log_size()) {
-		m_storage->pop_log_entry();
+	// At this point, logs match up to prev_log_index
+	log_entry_index_t index = message.prev_log_index + 1;
+	size_t i = 0;
+
+	// 4. Resolve conflicts (ONLY where needed)
+	while (i < message.entries.size()) {
+		if (index <= m_storage->get_log_size()) {
+			const auto& local = m_storage->get_log_entry(index);
+			const auto& incoming = message.entries[i];
+
+			if (local.term != incoming.term) {
+				// Conflict found: delete everything after this index
+				while (m_storage->get_log_size() >= index) {
+					// NEVER delete committed entries
+					assert(m_storage->get_log_size() > m_commit_index);
+					m_storage->pop_log_entry();
+				}
+				break;
+			}
+		} else {
+			break;
+		}
+		index++;
+		i++;
+	}
+
+	// 5. Append any new entries
+	size_t appended = 0;
+	for (; i < message.entries.size(); i++) {
+		m_storage->push_log_entry(message.entries[i]);
+		appended++;
 	}
 
 	response.success = true;
-	response.prev_log_index = m_storage->get_log_size();
+	response.prev_log_index = message.prev_log_index;
+	response.count = appended;
 
-	for (const log_entry_t& entry : message.entries) {
-		m_storage->push_log_entry(entry);
-	}
-
-	response.count = message.entries.size();
-
+	// 6. Update commit index
 	if (message.leader_commit > m_commit_index) {
-		m_commit_index = std::min(m_storage->get_log_size(), message.leader_commit);
+		m_commit_index = std::min(message.leader_commit, m_storage->get_log_size());
 	}
 
+	// 7. Apply committed entries
 	while (m_last_applied < m_commit_index) {
 		m_state_machine->apply(m_storage->get_log_entry(++m_last_applied));
 	}
 
-respond:
 	m_outbox.push_back(response);
-	return;
 }
 
 void
@@ -340,7 +369,7 @@ raft_node::handle(const request_vote_response& message)
 		m_received_votes.insert(message.src);
 	}
 
-	if (m_received_votes.size() > m_peers.size() / 2) {
+	if (m_received_votes.size() > (m_peers.size() + 1) / 2) {
 		state_transition(node_state_e::LEADER);
 		send_heartbeats();
 	}
