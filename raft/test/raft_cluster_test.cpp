@@ -32,6 +32,13 @@ public:
 		}
 	}
 
+	void TearDown() override
+	{
+		for (size_t i = 0; i < 3; i++) {
+			stop_node(i);
+		}
+	}
+
 	void tick_node(size_t index)
 	{
 		std::vector<raft_message_t> messages;
@@ -60,13 +67,20 @@ public:
 	void start_node(size_t index)
 	{
 		std::lock_guard lock{run_signal_mutex[index]};
+		std::lock_guard lock2(message_queue_mutexes[index]);
 		run_signal[index] = true;
+		std::vector<raft_message_t> empty_queue{};
+		std::swap(empty_queue, message_queues[index]);
+		threads[index] = std::jthread([this, index] { drive_node(index); });
 	}
 
 	void stop_node(size_t index)
 	{
-		std::lock_guard lock{run_signal_mutex[index]};
+		std::lock_guard lock1{run_signal_mutex[index]};
+		std::lock_guard lock2(message_queue_mutexes[index]);
 		run_signal[index] = false;
+		std::vector<raft_message_t> empty_queue{};
+		std::swap(empty_queue, message_queues[index]);
 	}
 
 	bool is_node_running(size_t index)
@@ -82,7 +96,7 @@ public:
 	std::array<std::shared_ptr<raft_state_machine>, 3> state_machines;
 	std::array<std::mutex, 3> message_queue_mutexes;
 	std::array<std::vector<raft_message_t>, 3> message_queues;
-	std::array<std::thread, 3> threads;
+	std::array<std::jthread, 3> threads;
 };
 
 TEST_F(RaftClusterTest, OneLeaderEmerges)
@@ -93,7 +107,6 @@ TEST_F(RaftClusterTest, OneLeaderEmerges)
 
 	for (size_t i = 0; i < 3; i++) {
 		start_node(i);
-		threads[i] = std::thread([this, i] { drive_node(i); });
 	}
 
 	std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -109,11 +122,18 @@ TEST_F(RaftClusterTest, OneLeaderEmerges)
 	}
 	ASSERT_EQ(leader_count, 1);
 	ASSERT_EQ(follower_count, 2);
+}
 
-	for (size_t i = 0; i < 3; i++) {
-		stop_node(i);
-	}
-	for (size_t i = 0; i < 3; i++) {
-		threads[i].join();
-	}
+TEST_F(RaftClusterTest, TermsEqualize)
+{
+	start_node(0);
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+	ASSERT_GT(nodes[0]->get_term(), nodes[1]->get_term());
+	ASSERT_GT(nodes[0]->get_term(), nodes[2]->get_term());
+
+	start_node(1);
+	start_node(2);
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+	ASSERT_EQ(nodes[0]->get_term(), nodes[1]->get_term());
+	ASSERT_EQ(nodes[0]->get_term(), nodes[2]->get_term());
 }

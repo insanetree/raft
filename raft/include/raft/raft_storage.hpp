@@ -24,6 +24,24 @@ public:
 
 	virtual void pop_log_entry() = 0;
 
+	// Equality operator for the purpose of debugging
+	bool operator==(const raft_storage& right) const
+	{
+		if (get_term() != right.get_term()) {
+			return false;
+		}
+		if (get_log_size() != right.get_log_size()) {
+			return false;
+		}
+		log_entry_index_t log_size = get_log_size();
+		for (log_entry_index_t i = 1; i <= log_size; i++) {
+			if (get_log_entry(i) != right.get_log_entry(i)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 protected:
 	raft_storage() = default;
 };

@@ -8,9 +8,9 @@
 size_t
 raft_node::random_election_threshold()
 {
-	static std::random_device rd;
-	static std::mt19937_64 gen(rd());
-	static std::uniform_int_distribution<size_t> dist(3 * heartbeat_threshold, 5 * heartbeat_threshold);
+	static thread_local std::random_device rd;
+	static thread_local std::mt19937_64 gen(rd());
+	static thread_local std::uniform_int_distribution<size_t> dist(3 * heartbeat_threshold, 5 * heartbeat_threshold);
 
 	return dist(gen);
 }
@@ -371,6 +371,7 @@ log_entry_index_t
 raft_node::append_log(std::vector<uint8_t> command)
 {
 	const std::unique_lock lock{m_mutex};
+	assert(m_state == node_state_e::LEADER);
 	m_storage->push_log_entry({.term = m_storage->get_term(), .command = std::move(command)});
 	return m_storage->get_log_size();
 }

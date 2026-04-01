@@ -16,6 +16,17 @@ struct log_entry_t
 {
 	leader_term_t term;
 	std::vector<uint8_t> command;
+
+	bool operator==(const log_entry_t& right) const
+	{
+		if (term != right.term) {
+			return false;
+		}
+		if (command != right.command) {
+			return false;
+		}
+		return true;
+	}
 };
 
 #endif
