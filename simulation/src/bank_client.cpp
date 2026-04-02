@@ -42,6 +42,7 @@ bank_client::random_transfer()
 	std::uniform_int_distribution<size_t> dist(1, m_balance);
 	size_t amount = dist(m_rng);
 	bank_client* peer = m_peers[m_rng() % m_peers.size()];
+	lock.unlock();
 	api_response_t resp;
 	do {
 		resp = m_leader_server->transfer(m_account_id, peer->get_id(), amount);
@@ -53,6 +54,7 @@ bank_client::random_transfer()
 			}
 		}
 	} while (resp.type != api_response_type::SUCCESS);
+	lock.lock();
 	m_balance -= amount;
 	m_completed_transfers++;
 	lock.unlock();
