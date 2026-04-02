@@ -269,15 +269,13 @@ raft_node::handle(const append_entries_request& message)
 	}
 
 	// 5. Append any new entries
-	size_t appended = 0;
 	for (; i < message.entries.size(); i++) {
 		m_storage->push_log_entry(message.entries[i]);
-		appended++;
 	}
 
 	response.success = true;
 	response.prev_log_index = message.prev_log_index;
-	response.count = appended;
+	response.count = message.entries.size();
 
 	// 6. Update commit index
 	if (message.leader_commit > m_commit_index) {
@@ -324,7 +322,7 @@ raft_node::handle(const request_vote_request& message)
 	request_vote_response response = {
 		.dest = message.candidate_id, .src = m_id, .term = m_storage->get_term(), .vote_granted = false};
 
-	if (message.candidate_term <= m_storage->get_term()) {
+	if (message.candidate_term < m_storage->get_term()) {
 		goto respond;
 	}
 

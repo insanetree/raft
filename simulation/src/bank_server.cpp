@@ -90,8 +90,8 @@ bank_server::open_account(account_id_t account_id)
 	}
 
 	log_index = m_node->append_log({bytes, bytes + sizeof(tx)});
-	server_tick.wait(lock, [&]() { return !m_node || m_node->get_commit_index() >= log_index; });
-	if (!m_node) {
+	server_tick.wait(lock, [&]() { return !m_node || m_commit_index >= log_index; });
+	if (m_commit_index < log_index && !m_node) {
 		goto return_error;
 	}
 
@@ -142,8 +142,8 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 	}
 
 	log_index = m_node->append_log({bytes, bytes + sizeof(tx)});
-	server_tick.wait(lock, [&]() { return !m_node || m_node->get_commit_index() >= log_index; });
-	if (!m_node) {
+	server_tick.wait(lock, [&]() { return !m_node || m_commit_index >= log_index; });
+	if (m_commit_index < log_index && !m_node) {
 		goto return_error;
 	}
 
@@ -182,6 +182,9 @@ bank_server::drive_node()
 		for (const raft_message_t& msg : messages) {
 			send_message(msg);
 		}
+		// This is important if the log is commited and the node fails in the same iteration. All the checks in APIs
+		// need to return success.
+		m_commit_index = m_node->get_commit_index();
 
 		server_tick.notify_all();
 

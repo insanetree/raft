@@ -67,6 +67,7 @@ private:
 	std::shared_ptr<raft_storage> m_storage;
 	std::shared_ptr<raft_state_machine> m_state_machine;
 	std::unique_ptr<raft_node> m_node;
+	log_entry_index_t m_commit_index;
 };
 
 #endif
