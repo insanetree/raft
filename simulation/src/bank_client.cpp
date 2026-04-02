@@ -13,6 +13,8 @@ bank_client::bank_client(std::span<std::shared_ptr<bank_server>> servers) :
 	m_rng(m_rd()),
 	m_run(true),
 	m_account_id(s_next_account_id++),
+	m_balance(0),
+	m_completed_transfers(0),
 	m_servers(servers),
 	m_leader_server(servers[0]),
 	m_peers()
@@ -21,6 +23,11 @@ bank_client::bank_client(std::span<std::shared_ptr<bank_server>> servers) :
 		return this->m_account_id == peer->get_id();
 	}));
 	s_clients.push_back(this);
+}
+
+bank_client::~bank_client()
+{
+	spdlog::info("CLIENT {}: completed {} transfers", m_account_id, m_completed_transfers);
 }
 
 void
@@ -52,6 +59,7 @@ bank_client::random_transfer()
 		}
 	} while (resp.type != api_response_type::SUCCESS);
 	m_balance -= amount;
+	m_completed_transfers++;
 	lock.unlock();
 	peer->transfer(amount);
 }

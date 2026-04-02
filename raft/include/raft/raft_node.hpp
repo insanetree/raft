@@ -73,6 +73,12 @@ public:
 		return m_last_applied;
 	}
 
+	log_entry_index_t get_log_size() const
+	{
+		const std::unique_lock lock{m_mutex};
+		return m_storage->get_log_size();
+	}
+
 	node_id_t get_leader_id() const
 	{
 		const std::unique_lock lock{m_mutex};

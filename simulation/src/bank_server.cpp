@@ -1,5 +1,6 @@
 #include "simulation/bank_server.hpp"
 
+#include "simulation/api_response.hpp"
 #include "spdlog/spdlog.h"
 
 #include <cassert>
@@ -88,6 +89,9 @@ bank_server::open_account(account_id_t account_id)
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
 		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
+	if (m_node->get_log_size() > m_commit_index) {
+		goto try_again;
+	}
 
 	log_index = m_node->append_log({bytes, bytes + sizeof(tx)});
 	server_tick.wait(lock, [&]() { return !m_node || m_commit_index >= log_index; });
@@ -98,6 +102,8 @@ bank_server::open_account(account_id_t account_id)
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
 return_error:
 	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
+try_again:
+	return {.type = api_response_type::AGAIN, .redirect_to = m_id};
 }
 
 api_response_t
@@ -110,11 +116,16 @@ bank_server::get_balance(account_id_t account_id, size_t& out_balance)
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
 		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
+	if (m_node->get_log_size() > m_commit_index) {
+		goto try_again;
+	}
 
 	out_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(account_id);
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
 return_error:
 	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
+try_again:
+	return {.type = api_response_type::AGAIN, .redirect_to = m_id};
 }
 
 api_response_t
@@ -135,6 +146,10 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
 
+	if (m_node->get_log_size() > m_commit_index) {
+		goto try_again;
+	}
+
 	from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
 
 	if (from_balance < amount) {
@@ -150,6 +165,8 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
 return_error:
 	return {.type = api_response_type::ERROR, .redirect_to = INVALID_NODE_ID};
+try_again:
+	return {.type = api_response_type::AGAIN, .redirect_to = m_id};
 }
 
 void
