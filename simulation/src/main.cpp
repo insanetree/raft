@@ -18,7 +18,7 @@ std::array<std::shared_ptr<bank_client>, CLIENT_NUM> g_client_array{};
 int
 main()
 {
-	spdlog::set_level(spdlog::level::info);
+	spdlog::set_level(spdlog::level::debug);
 	spdlog::info("Starting simulation");
 	for (size_t i = 0; i < CLUSTER_SIZE; i++) {
 		g_storage_array[i] = std::make_shared<raft_storage_memory>();
@@ -45,7 +45,7 @@ main()
 	});
 
 	// let clients run for a bit
-	std::this_thread::sleep_for(std::chrono::seconds(60));
+	std::this_thread::sleep_for(std::chrono::minutes(5));
 
 	// stop server failures
 	std::for_each(g_server_array.begin(), g_server_array.end(), [](std::shared_ptr<bank_server> server) {

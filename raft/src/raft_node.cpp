@@ -1,9 +1,25 @@
 #include "raft/raft_node.hpp"
 
+#include "spdlog/spdlog.h"
+
 #include <algorithm>
 #include <cassert>
 #include <random>
 #include <vector>
+
+static const char*
+state_name(raft_node::node_state_e state)
+{
+	switch (state) {
+	case raft_node::node_state_e::FOLLOWER:
+		return "FOLLOWER";
+	case raft_node::node_state_e::CANDIDATE:
+		return "CANDIDATE";
+	case raft_node::node_state_e::LEADER:
+		return "LEADER";
+	}
+	return "UNKNOWN";
+}
 
 size_t
 raft_node::random_election_threshold()
@@ -73,6 +89,7 @@ raft_node::state_transition(node_state_e state)
 	}
 
 	// Switch state
+	spdlog::debug("NODE {}: {} -> {} (term {})", m_id, state_name(m_state), state_name(state), m_storage->get_term());
 	m_state = state;
 }
 
@@ -81,6 +98,7 @@ raft_node::update_term(const leader_term_t new_term)
 {
 	assert(m_storage->get_term() < new_term);
 
+	spdlog::debug("NODE {}: term {} -> {}", m_id, m_storage->get_term(), new_term);
 	state_transition(node_state_e::FOLLOWER);
 	m_storage->set_term(new_term);
 	m_storage->set_voted_for(INVALID_NODE_ID);
@@ -109,6 +127,11 @@ raft_node::tick()
 
 	// Needed for special case where there is only one node in a cluster
 	if (m_received_votes.size() > (m_peers.size() + 1) / 2) {
+		spdlog::info("NODE {}: won election at term {} with {}/{} votes",
+		             m_id,
+		             m_storage->get_term(),
+		             m_received_votes.size(),
+		             m_peers.size() + 1);
 		state_transition(node_state_e::LEADER);
 		send_heartbeats();
 	}
@@ -125,6 +148,7 @@ raft_node::start_election()
 
 	leader_term_t term = m_storage->get_term();
 	m_storage->set_term(++term);
+	spdlog::debug("NODE {}: starting election at term {}", m_id, term);
 	log_entry_index_t last_log_index = m_storage->get_log_size();
 
 	request_vote_request msg = {.dest = 0,
@@ -322,7 +346,7 @@ raft_node::handle(const request_vote_request& message)
 	request_vote_response response = {
 		.dest = message.candidate_id, .src = m_id, .term = m_storage->get_term(), .vote_granted = false};
 
-	if (message.candidate_term < m_storage->get_term()) {
+	if (message.candidate_term <= m_storage->get_term()) {
 		goto respond;
 	}
 
@@ -368,6 +392,11 @@ raft_node::handle(const request_vote_response& message)
 	}
 
 	if (m_received_votes.size() > (m_peers.size() + 1) / 2) {
+		spdlog::info("NODE {}: won election at term {} with {}/{} votes",
+		             m_id,
+		             m_storage->get_term(),
+		             m_received_votes.size(),
+		             m_peers.size() + 1);
 		state_transition(node_state_e::LEADER);
 		send_heartbeats();
 	}
