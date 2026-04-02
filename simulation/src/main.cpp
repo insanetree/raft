@@ -45,14 +45,16 @@ main()
 	});
 
 	// let clients run for a bit
-	std::this_thread::sleep_for(std::chrono::minutes(5));
+	std::this_thread::sleep_for(std::chrono::seconds(30));
 
 	// stop server failures
+	spdlog::info("Stopping server failure simulation");
 	std::for_each(g_server_array.begin(), g_server_array.end(), [](std::shared_ptr<bank_server> server) {
 		server->stop_simulation_failures();
 	});
 
 	// wait for stabilization
+	spdlog::info("Waiting for system stabilization");
 	std::this_thread::sleep_for(std::chrono::seconds(10));
 
 	// stop clients
