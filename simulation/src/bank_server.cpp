@@ -131,14 +131,14 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 		goto return_error;
 	}
 
+	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
+		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
+	}
+
 	from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
 
 	if (from_balance < amount) {
 		goto return_error;
-	}
-
-	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
-		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
 
 	log_index = m_node->append_log({bytes, bytes + sizeof(tx)});
