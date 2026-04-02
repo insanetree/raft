@@ -25,11 +25,6 @@ bank_client::bank_client(std::span<std::shared_ptr<bank_server>> servers) :
 	s_clients.push_back(this);
 }
 
-bank_client::~bank_client()
-{
-	spdlog::info("CLIENT {}: completed {} transfers", m_account_id, m_completed_transfers);
-}
-
 void
 bank_client::transfer(size_t amount)
 {
@@ -123,4 +118,5 @@ bank_client::drive_client()
 		} while (resp.type != api_response_type::SUCCESS);
 		assert(balance == m_balance);
 	}
+	spdlog::info("CLIENT {}: completed {} transfers", m_account_id, m_completed_transfers);
 }

@@ -71,7 +71,7 @@ main()
 	// wait for clients and servers to stop
 	std::for_each(threads_array.begin(), threads_array.end(), [](std::jthread& thread) { thread.join(); });
 
-	assert(std::all_of(&g_storage_array[1], &g_storage_array[CLUSTER_SIZE], [](std::shared_ptr<raft_storage> storage) {
+	assert(std::all_of(g_storage_array.begin(), g_storage_array.end(), [](std::shared_ptr<raft_storage> storage) {
 		return *storage == *g_storage_array[0];
 	}));
 

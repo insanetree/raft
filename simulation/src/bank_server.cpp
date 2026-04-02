@@ -130,9 +130,14 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 	if (!m_node || !m_state_machine) {
 		goto return_error;
 	}
-
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
 		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
+	}
+	// Can't check available funds on stale state. Must wait for 2
+	log_index = m_node->get_log_size();
+	server_tick.wait(lock, [&]() { return !m_node || m_commit_index >= log_index; });
+	if (!m_node) {
+		goto return_error;
 	}
 
 	from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
@@ -174,34 +179,42 @@ bank_server::drive_node()
 	spdlog::info("SERVER {}: online", m_id);
 	while (get_run()) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		std::unique_lock<std::mutex> lock{m_mutex};
-		std::vector<raft_message_t> messages = get_messages(m_node->get_id());
-		m_node->step(messages);
-		m_node->tick();
-		messages = m_node->get_messages();
+		std::vector<raft_message_t> messages = get_messages(m_id);
+		{
+			std::unique_lock<std::mutex> lock{m_mutex};
+			m_node->step(messages);
+			m_node->tick();
+			messages = m_node->get_messages();
+		}
 		for (const raft_message_t& msg : messages) {
 			send_message(msg);
 		}
 		// This is important if the log is commited and the node fails in the same iteration. All the checks in APIs
 		// need to return success.
-		m_commit_index = m_node->get_commit_index();
-
-		server_tick.notify_all();
+		{
+			std::unique_lock<std::mutex> lock{m_mutex};
+			m_commit_index = m_node->get_commit_index();
+			server_tick.notify_all();
+		}
 
 		static thread_local std::random_device rd;
 		static thread_local std::mt19937_64 rng{rd()};
-		static thread_local std::uniform_int_distribution<uint64_t> un{0, 10000};
+		static thread_local std::uniform_int_distribution<uint64_t> un{0, 1000};
 		// if 0 is rolled, shut down the server
 		if (!un(rng) && m_simulate_failures) {
-			spdlog::info("SERVER {}: simulating failure", m_id);
-			m_node.reset();
-			m_state_machine.reset();
-			lock.unlock();
+			{
+				std::unique_lock<std::mutex> lock{m_mutex};
+				spdlog::info("SERVER {}: simulating failure", m_id);
+				m_node.reset();
+				m_state_machine.reset();
+			}
 			std::this_thread::sleep_for(std::chrono::seconds(1));
-			lock.lock();
-			spdlog::info("SERVER {}: back online", m_id);
-			m_state_machine = std::make_shared<bank_balances>();
-			m_node = std::make_unique<raft_node>(m_id, m_peers, m_storage, m_state_machine);
+			{
+				std::unique_lock<std::mutex> lock{m_mutex};
+				spdlog::info("SERVER {}: back online", m_id);
+				m_state_machine = std::make_shared<bank_balances>();
+				m_node = std::make_unique<raft_node>(m_id, m_peers, m_storage, m_state_machine);
+			}
 			// discard any received messages
 			get_messages(m_id);
 		}

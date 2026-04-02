@@ -12,7 +12,6 @@ public:
 	bank_client(std::span<std::shared_ptr<bank_server>> servers);
 	bank_client(const bank_client&) = delete;
 	bank_client(bank_client&&) = delete;
-	~bank_client();
 
 	account_id_t get_id() const { return m_account_id; }
 
