@@ -7,8 +7,7 @@ enum class api_response_type
 {
 	SUCCESS,
 	ERROR,
-	REDIRECT,
-	AGAIN
+	REDIRECT
 };
 
 struct api_response_t
