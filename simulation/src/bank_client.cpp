@@ -26,13 +26,6 @@ bank_client::bank_client(std::span<std::shared_ptr<bank_server>> servers) :
 }
 
 void
-bank_client::transfer(size_t amount)
-{
-	std::unique_lock<std::mutex> lock{m_mutex};
-	m_balance += amount;
-}
-
-void
 bank_client::random_transfer()
 {
 	std::unique_lock<std::mutex> lock{m_mutex};
@@ -54,11 +47,7 @@ bank_client::random_transfer()
 			}
 		}
 	} while (resp.type != api_response_type::SUCCESS);
-	lock.lock();
-	m_balance -= amount;
 	m_completed_transfers++;
-	lock.unlock();
-	peer->transfer(amount);
 }
 
 void
@@ -101,13 +90,6 @@ bank_client::drive_client(std::barrier<>& barrier)
 	while (get_run()) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		random_transfer();
-	}
-	spdlog::info("CLIENT {}: stopping", m_account_id);
-
-	// wait for servers to stabilize
-	std::this_thread::sleep_for(std::chrono::seconds(5));
-	barrier.arrive_and_wait();
-	{
 		do {
 			resp = m_leader_server->get_balance(m_account_id, balance);
 			if (resp.type != api_response_type::SUCCESS) {
@@ -118,10 +100,12 @@ bank_client::drive_client(std::barrier<>& barrier)
 				}
 			}
 		} while (resp.type != api_response_type::SUCCESS);
+		m_balance = balance;
 	}
-	if (balance != m_balance) {
-		spdlog::critical("CLIENT {}: balance mismatch!", m_account_id);
-	}
+	spdlog::info("CLIENT {}: stopping", m_account_id);
+
+	// wait for servers to stabilize
+	std::this_thread::sleep_for(std::chrono::seconds(5));
 	spdlog::info("CLIENT {}: completed {} transfers", m_account_id, m_completed_transfers);
 	barrier.arrive_and_wait();
 }

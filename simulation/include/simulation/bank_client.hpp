@@ -3,6 +3,7 @@
 
 #include "simulation/bank_server.hpp"
 
+#include <atomic>
 #include <barrier>
 #include <random>
 #include <span>
@@ -18,6 +19,8 @@ public:
 
 	void drive_client(std::barrier<>& barrier);
 
+	size_t get_balance() const { return m_balance; }
+
 	bool get_run() const
 	{
 		std::unique_lock<std::mutex> lock{m_mutex};
@@ -29,8 +32,6 @@ public:
 		std::unique_lock<std::mutex> lock{m_mutex};
 		m_run = false;
 	};
-
-	void transfer(size_t amount);
 
 private:
 	void random_transfer();
@@ -44,7 +45,7 @@ private:
 
 	bool m_run;
 	account_id_t m_account_id;
-	size_t m_balance;
+	std::atomic_size_t m_balance;
 	size_t m_completed_transfers;
 
 	std::span<std::shared_ptr<bank_server>> m_servers;

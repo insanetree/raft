@@ -111,7 +111,16 @@ api_response_t
 bank_server::get_balance(account_id_t account_id, size_t& out_balance)
 {
 	std::unique_lock<std::mutex> lock(m_mutex);
+	log_entry_index_t log_index;
 	if (!m_node || !m_state_machine) {
+		goto return_error;
+	}
+	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
+		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
+	}
+	log_index = m_node->get_log_size();
+	server_tick.wait(lock, [&]() { return !m_node || m_commit_index >= log_index; });
+	if (m_commit_index < log_index && !m_node) {
 		goto return_error;
 	}
 	if (m_node->get_state() != raft_node::node_state_e::LEADER) {

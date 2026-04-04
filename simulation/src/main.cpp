@@ -67,8 +67,6 @@ main()
 
 	// wait for clients to stop transactions
 	client_barrier.arrive_and_wait();
-	// wait for clients to end balance check
-	client_barrier.arrive_and_wait();
 
 	// stop servers
 	std::for_each(
@@ -81,6 +79,13 @@ main()
 	assert(std::all_of(g_storage_array.begin(), g_storage_array.end(), [](std::shared_ptr<raft_storage> storage) {
 		return *storage == *g_storage_array[0];
 	}));
+
+	size_t sum = std::transform_reduce(g_client_array.begin(),
+	                                   g_client_array.end(),
+	                                   0ul,
+	                                   std::plus<>(),
+	                                   [](const std::shared_ptr<bank_client> client) { return client->get_balance(); });
+	assert(sum == CLIENT_NUM * bank_server::STARTING_BALANCE);
 
 	return 0;
 }
