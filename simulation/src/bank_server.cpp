@@ -20,6 +20,9 @@ public:
 	void apply(log_entry_t log_entry) override
 	{
 		std::unique_lock lock{m_mutex};
+		if (log_entry.is_noop()) {
+			return;
+		}
 		assert(log_entry.command.size() == sizeof(bank_transaction));
 		bank_transaction tx = *reinterpret_cast<const bank_transaction*>(log_entry.command.data());
 
@@ -53,7 +56,8 @@ bank_server::bank_server(size_t id, std::vector<node_id_t> peers, std::shared_pt
 	m_peers(peers),
 	m_storage(storage),
 	m_state_machine(std::make_shared<bank_balances>()),
-	m_node(std::make_unique<raft_node>(id, peers, storage, m_state_machine))
+	m_node(std::make_unique<raft_node>(id, peers, storage, m_state_machine)),
+	m_commit_index(0)
 {
 	std::lock_guard<std::mutex> lock{s_inbox_mutex};
 	s_inbox.emplace(id, std::vector<raft_message_t>{});
@@ -93,6 +97,9 @@ bank_server::open_account(account_id_t account_id)
 	server_tick.wait(lock, [&]() { return !m_node || m_commit_index >= log_index; });
 	if (m_commit_index < log_index && !m_node) {
 		goto return_error;
+	}
+	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
+		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
 	}
 
 	return {.type = api_response_type::SUCCESS, .redirect_to = INVALID_NODE_ID};
@@ -139,6 +146,9 @@ bank_server::transfer(account_id_t from, account_id_t to, size_t amount)
 	if (!m_node) {
 		goto return_error;
 	}
+	if (m_node->get_state() != raft_node::node_state_e::LEADER) {
+		return {.type = api_response_type::REDIRECT, .redirect_to = m_node->get_leader_id()};
+	}
 
 	from_balance = std::static_pointer_cast<bank_balances>(m_state_machine)->get_balance(from);
 
@@ -180,20 +190,20 @@ bank_server::drive_node(std::latch& latch)
 	while (get_run()) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		std::vector<raft_message_t> messages = get_messages(m_id);
-		{
-			std::unique_lock<std::mutex> lock{m_mutex};
-			m_node->step(messages);
-			m_node->tick();
-			messages = m_node->get_messages();
-		}
+		m_node->step(messages);
+		m_node->tick();
+		messages = m_node->get_messages();
 		for (const raft_message_t& msg : messages) {
 			send_message(msg);
 		}
+
+		log_entry_index_t commit_index = m_node->get_commit_index();
+
 		// This is important if the log is commited and the node fails in the same iteration. All the checks in APIs
 		// need to return success.
 		{
 			std::unique_lock<std::mutex> lock{m_mutex};
-			m_commit_index = m_node->get_commit_index();
+			m_commit_index = commit_index;
 			server_tick.notify_all();
 		}
 

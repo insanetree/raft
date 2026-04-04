@@ -37,7 +37,7 @@ main()
 	}
 
 	std::vector<std::jthread> threads_array;
-	std::latch client_latch{CLIENT_NUM};
+	std::barrier<> client_barrier{CLIENT_NUM + 1};
 	std::latch server_latch{CLUSTER_SIZE};
 	std::for_each(g_server_array.begin(),
 	              g_server_array.end(),
@@ -47,12 +47,13 @@ main()
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 	std::for_each(g_client_array.begin(),
 	              g_client_array.end(),
-	              [&threads_array, &client_latch](std::shared_ptr<bank_client> client) {
-					  threads_array.emplace_back([client, &client_latch]() { client->drive_client(client_latch); });
+	              [&threads_array, &client_barrier](std::shared_ptr<bank_client> client) {
+					  threads_array.emplace_back([client, &client_barrier]() { client->drive_client(client_barrier); });
 				  });
+	client_barrier.arrive_and_wait();
 
 	// let clients run for a bit
-	std::this_thread::sleep_for(std::chrono::seconds(30));
+	std::this_thread::sleep_for(std::chrono::seconds(10));
 
 	// stop server failures
 	spdlog::info("Stopping server failure simulation");
@@ -60,16 +61,14 @@ main()
 		server->stop_simulation_failures();
 	});
 
-	// wait for stabilization
-	spdlog::info("Waiting for system stabilization");
-	std::this_thread::sleep_for(std::chrono::seconds(10));
-
 	// stop clients
 	std::for_each(
 		g_client_array.begin(), g_client_array.end(), [](std::shared_ptr<bank_client> client) { client->stop(); });
 
-	// wait for stabilization
-	client_latch.wait();
+	// wait for clients to stop transactions
+	client_barrier.arrive_and_wait();
+	// wait for clients to end balance check
+	client_barrier.arrive_and_wait();
 
 	// stop servers
 	std::for_each(

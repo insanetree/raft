@@ -27,6 +27,7 @@ struct log_entry_t
 		}
 		return true;
 	}
+	bool is_noop() const { return command.empty(); }
 };
 
 #endif

@@ -83,6 +83,8 @@ raft_node::state_transition(node_state_e state)
 			m_next_index.emplace(peer, m_storage->get_log_size() + 1);
 			m_match_index.emplace(peer, 0);
 		}
+		// Append a noop entry on leader election
+		m_storage->push_log_entry({.term = m_storage->get_term(), .command = {}});
 	} else if (state == node_state_e::CANDIDATE) {
 		m_leader_id = INVALID_NODE_ID;
 		m_received_votes.insert(m_id);
@@ -176,6 +178,7 @@ raft_node::send_heartbeats()
 void
 raft_node::update_commit_index()
 {
+	assert(m_state == node_state_e::LEADER);
 	std::vector<log_entry_index_t> match_indices;
 	match_indices.reserve(m_peers.size() + 1);
 	match_indices.push_back(m_storage->get_log_size());
