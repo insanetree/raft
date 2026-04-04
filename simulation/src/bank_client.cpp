@@ -62,7 +62,7 @@ bank_client::random_transfer()
 }
 
 void
-bank_client::drive_client()
+bank_client::drive_client(std::latch& latch)
 {
 	spdlog::info("CLIENT {}: online", m_account_id);
 	std::copy_if(
@@ -121,4 +121,5 @@ bank_client::drive_client()
 		assert(balance == m_balance);
 	}
 	spdlog::info("CLIENT {}: completed {} transfers", m_account_id, m_completed_transfers);
+	latch.arrive_and_wait();
 }

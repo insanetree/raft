@@ -174,7 +174,7 @@ bank_server::get_messages(size_t id)
 }
 
 void
-bank_server::drive_node()
+bank_server::drive_node(std::latch& latch)
 {
 	spdlog::info("SERVER {}: online", m_id);
 	while (get_run()) {
@@ -220,4 +220,5 @@ bank_server::drive_node()
 		}
 	}
 	spdlog::info("SERVER {}: stopping", m_id);
+	latch.arrive_and_wait();
 }

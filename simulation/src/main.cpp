@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <latch>
 #include <thread>
 #include <vector>
 
@@ -36,13 +37,19 @@ main()
 	}
 
 	std::vector<std::jthread> threads_array;
-	std::for_each(g_server_array.begin(), g_server_array.end(), [&threads_array](std::shared_ptr<bank_server> server) {
-		threads_array.emplace_back([server]() { server->drive_node(); });
-	});
+	std::latch client_latch{CLIENT_NUM};
+	std::latch server_latch{CLUSTER_SIZE};
+	std::for_each(g_server_array.begin(),
+	              g_server_array.end(),
+	              [&threads_array, &server_latch](std::shared_ptr<bank_server> server) {
+					  threads_array.emplace_back([server, &server_latch]() { server->drive_node(server_latch); });
+				  });
 	std::this_thread::sleep_for(std::chrono::seconds(1));
-	std::for_each(g_client_array.begin(), g_client_array.end(), [&threads_array](std::shared_ptr<bank_client> client) {
-		threads_array.emplace_back([client]() { client->drive_client(); });
-	});
+	std::for_each(g_client_array.begin(),
+	              g_client_array.end(),
+	              [&threads_array, &client_latch](std::shared_ptr<bank_client> client) {
+					  threads_array.emplace_back([client, &client_latch]() { client->drive_client(client_latch); });
+				  });
 
 	// let clients run for a bit
 	std::this_thread::sleep_for(std::chrono::seconds(30));
@@ -62,11 +69,12 @@ main()
 		g_client_array.begin(), g_client_array.end(), [](std::shared_ptr<bank_client> client) { client->stop(); });
 
 	// wait for stabilization
-	std::this_thread::sleep_for(std::chrono::seconds(5));
+	client_latch.wait();
 
 	// stop servers
 	std::for_each(
 		g_server_array.begin(), g_server_array.end(), [](std::shared_ptr<bank_server> server) { server->stop(); });
+	server_latch.wait();
 
 	// wait for clients and servers to stop
 	std::for_each(threads_array.begin(), threads_array.end(), [](std::jthread& thread) { thread.join(); });

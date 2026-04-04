@@ -25,12 +25,13 @@ protected:
 
 	void drive()
 	{
-		m_driver = std::thread([&]() { m_server->drive_node(); });
+		m_driver = std::thread([&]() { m_server->drive_node(m_latch); });
 	}
 
 	std::shared_ptr<raft_storage_memory> m_storage;
 	std::shared_ptr<bank_server> m_server;
 	std::thread m_driver;
+	std::latch m_latch{1};
 };
 
 TEST_F(BankServerSingleTest, InitialStateIsFollower)

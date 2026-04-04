@@ -7,6 +7,7 @@
 #include "simulation/api_response.hpp"
 
 #include <condition_variable>
+#include <latch>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -48,7 +49,7 @@ public:
 		m_simulate_failures = false;
 	}
 
-	void drive_node();
+	void drive_node(std::latch& latch);
 
 private:
 	static void send_message(const raft_message_t& msg);

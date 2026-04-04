@@ -3,6 +3,7 @@
 
 #include "simulation/bank_server.hpp"
 
+#include <latch>
 #include <random>
 #include <span>
 
@@ -15,7 +16,7 @@ public:
 
 	account_id_t get_id() const { return m_account_id; }
 
-	void drive_client();
+	void drive_client(std::latch& latch);
 
 	bool get_run() const
 	{
