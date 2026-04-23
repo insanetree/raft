@@ -85,7 +85,10 @@ main()
 	                                   0ul,
 	                                   std::plus<>(),
 	                                   [](const std::shared_ptr<bank_client> client) { return client->get_balance(); });
-	assert(sum == CLIENT_NUM * bank_server::STARTING_BALANCE);
+	if (sum != CLIENT_NUM * bank_server::STARTING_BALANCE) {
+		spdlog::critical("FAIL: sum={}, staring sum={}", sum, CLIENT_NUM * bank_server::STARTING_BALANCE);
+		std::abort();
+	}
 
 	return 0;
 }
